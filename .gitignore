@@ -1,3 +1,4 @@
 .vscode/
 __pycache__/
 id_github*
+.venv/

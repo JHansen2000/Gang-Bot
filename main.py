@@ -24,7 +24,7 @@ GUILD = Object(id=GUILD)
 intents: Intents = Intents.default()
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
-get_commands(tree)
+get_commands(tree, GUILD)
 
 @client.event
 async def on_ready() -> None:
