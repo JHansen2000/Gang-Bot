@@ -2,3 +2,4 @@
 __pycache__/
 id_github*
 .venv/
+credentials.json
