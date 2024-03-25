@@ -1,8 +1,11 @@
 import os
-from discord import Interaction, TextStyle, ui
+from discord import Interaction, Member
+from gspread_dataframe import set_with_dataframe
 import gspread
 import logger
 from sheets import connect
+from utility import get_power
+import pandas as pd
 log = logger.Logger()
 
 def get_commands(tree, guild):
@@ -28,13 +31,31 @@ def get_commands(tree, guild):
         guild=guild,
     )
     async def test(interaction: Interaction) -> None:
-        wks = await connect("Example")
-        if not wks:
+        worksheet = await connect("Example")
+        # dataframe = pd.DataFrame(worksheet.get_all_values())
+        dataframe = pd.read_csv("data.txt")
+        if dataframe is None:
             await interaction.response.send_message("Sorry! I was unable to connect to the spreadsheet")
             return
-        # wks.sheet1.update('B1', str(int(wks.sheet1.get('B1')[0][0]) + 1))
-        wks.sheet1.update('B1', 'Bingo!')
-        await interaction.response.send_message(wks.sheet1.get('A1:B1'))
+        dataframe.iloc[3, 1] = int(dataframe.iloc[3, 1]) + 1
+        set_with_dataframe(worksheet, dataframe)
+        dataframe.to_csv('data.txt', index=False)
+        await interaction.response.send_message(dataframe)
+
+    @tree.command (
+        name="user",
+        description="how do I send a user to the server?",
+        guild=guild,
+    )
+    async def user(interaction: Interaction, member: Member) -> None:
+        """Does something
+
+        Parameters
+        -----------
+        member: discord.Member
+            the member to interact with
+        """
+        await interaction.response.send_message(get_power(member))
 
 
 
