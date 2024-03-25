@@ -1,5 +1,5 @@
 .vscode/
 __pycache__/
-id_github*
 .venv/
-credentials.json
+private/*
+!private/PRIVATE.md

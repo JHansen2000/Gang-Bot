@@ -20,7 +20,7 @@ if not GUILD:
     exit()
 GUILD = Object(id=GUILD)
 
-# Declarations
+# Declarations -> None
 intents: Intents = Intents.default()
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)

@@ -2,8 +2,8 @@
 - Create .venv (via VS Code)
     - Cmd + P: ">Python: Create Environment..."
 - `pip install -r requirements.txt`
-- Download and rename to credentials.json from Google Cloud
-    - https://console.cloud.google.com/apis/credentials?project=discord-gang-bot
+- Obtain the GCloud Service Account private_key.json from Heros451 (Discord: chuckledusters)
+- Share the spreadsheet with the `client_email` in private_key.json
 - `python3 main.py`
 
 ## TODO
