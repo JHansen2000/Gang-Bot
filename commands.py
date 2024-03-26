@@ -14,7 +14,7 @@ def get_commands(tree, guild):
     )
     async def ping(interaction: Interaction) -> None:
         log.info("Command Received: ping")
-        if not can_execute(interaction.user, 1, None):
+        if not can_execute(interaction.user, 1, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
         await interaction.response.send_message("Pong!")
@@ -26,7 +26,7 @@ def get_commands(tree, guild):
     )
     async def pong(interaction: Interaction) -> None:
         log.info("Command Received: pong")
-        if not can_execute(interaction.user, 1, None):
+        if not can_execute(interaction.user, 1, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
         await interaction.response.send_message("Ping!")
@@ -45,7 +45,7 @@ def get_commands(tree, guild):
             The role of the gang to get the roster for
         """
         log.info("Command Received: test")
-        if not can_execute(interaction.user, 2, None):
+        if not can_execute(interaction.user, 2, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
         worksheet = get_worksheet(gang_role.name)
@@ -76,7 +76,7 @@ def get_commands(tree, guild):
             the member to interact with
         """
         log.info("Command Received: user")
-        if not can_execute(interaction.user, 2, None):
+        if not can_execute(interaction.user, 2, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
         await interaction.response.send_message(get_power(member))
@@ -86,7 +86,7 @@ def get_commands(tree, guild):
         description="Creates role, roster, and channels for a gang",
         guild=guild,
     )
-    async def create_gang(interaction: Interaction, gang_name: str, color_request: str = None) -> None:
+    async def create_gang(interaction: Interaction, gang_name: str, color_request: str | None = None) -> None:
         """Creates all base resources for a gang including:
         - Discord Role
         - Roster
@@ -100,7 +100,7 @@ def get_commands(tree, guild):
             the primary color of the gang in hex format (e.g. #000000, 000000)
         """
         log.info("Command Received: create_gang")
-        if not can_execute(interaction.user, 6, None):
+        if not can_execute(interaction.user, 6, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
 
@@ -112,10 +112,7 @@ def get_commands(tree, guild):
             return
         dataframe = pd.DataFrame(worksheet.get_values()[1:], columns=worksheet.get_values()[0])
 
-        if not color_request:
-            color_request = Colour.default()
-
-        newRole = new_role(guild, gang_name, color_request)
+        newRole = await new_role(guild, gang_name, color_request)
 
         if not newRole:
             await interaction.response.send_message("Failed to create new role")
@@ -140,7 +137,7 @@ def get_commands(tree, guild):
             the role of the gang to delete
         """
         log.info("Command Received: delete_gang")
-        if not can_execute(interaction.user, 6, None):
+        if not can_execute(interaction.user, 6, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
 

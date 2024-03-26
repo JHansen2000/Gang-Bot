@@ -15,7 +15,9 @@ def get_power(member: Member) -> int:
   power = 0
   for role in member.roles:
     if role.name in ROLES:
-      power = max(ROLES.get(role.name), power)
+      role_power = ROLES.get(role.name)
+      if role_power:
+        power = max(role_power, power)
   return power
 
 def can_execute(member: Member, required_power: int, target) -> bool:
@@ -23,7 +25,7 @@ def can_execute(member: Member, required_power: int, target) -> bool:
     if get_power(member) >= required_power:
       log.info("User meets/exceeds required power")
       return True
-    log.warn("User does not meet required power")
+    log.warning("User does not meet required power")
     return False
 
   print(target)
@@ -31,29 +33,34 @@ def can_execute(member: Member, required_power: int, target) -> bool:
   if get_power(member) >= required_power:
     log.info("User meets/exceeds required power")
     return True
-  log.warn("User does not meet required power")
+  log.warning("User does not meet required power")
   return False
 
-def new_role(guild: Guild, roleName: str, colorRequest: str) -> Role | None:
-  match len(colorRequest):
-    case 6:
-      color = int(colorRequest.strip())
-    case 7:
-      color = int(colorRequest.strip[1:])
-    case _:
-      color = Colour.default()
+async def new_role(guild: Guild, roleName: str, colorRequest: str | None) -> Role | None:
+
+  if not colorRequest:
+
+    color = Colour.default()
+  else:
+    match len(colorRequest):
+      case 6:
+        color = int(colorRequest.strip())
+      case 7:
+        color = int(colorRequest.strip()[1:])
+      case _:
+        color = Colour.default()
 
   try:
-    newRole = guild.create_role(name=roleName, color=color, hoist=True, mentionable=True)
+    newRole = await guild.create_role(name=roleName, color=color, hoist=True, mentionable=True) 
     log.info(f"Created new role @{newRole.name}")
     return newRole
   except Exception as e:
     log.error(f"Failed to create role @{roleName}\n\n{e}")
     return
 
-def delete_role(role: Role) -> bool:
+async def delete_role(role: Role) -> bool:
   try:
-    role.delete()
+    await role.delete()
     log.info(f"Deleted role @{role.name}")
     return True
   except Exception as e:
