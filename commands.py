@@ -31,16 +31,18 @@ def get_commands(tree, guild):
         guild=guild,
     )
     async def test(interaction: Interaction) -> None:
-        worksheet = await connect("Example")
+        worksheet = await connect("Gang Bot DB")
         if not worksheet:
             await interaction.response.send_message("Sorry! I was unable to connect to the spreadsheet")
             return
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
+
         # dataframe = pd.read_csv("data.txt")
-        dataframe.iloc[3, 1] = int(dataframe.iloc[3, 1]) + 1 # type: ignore
-        set_with_dataframe(worksheet, dataframe)
+        # dataframe.iloc[3, 1] = int(dataframe.iloc[3, 1]) + 1 # type: ignore
+        # set_with_dataframe(worksheet, dataframe)
         # dataframe.to_csv('data.txt', index=False)
+        
         await interaction.response.send_message('```' + dataframe.to_string() + '```')
 
     @tree.command (
