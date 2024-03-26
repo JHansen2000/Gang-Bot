@@ -7,8 +7,19 @@
 - `python3 main.py`
 
 ## TODO
-- Identify commands from admins
-- Update a remote roster (google sheets w/ pandas)
+- Create following event handlers:
+  - User Nickname Change
+  - Role Color Modified
+  - User Role Change
+    - Command role changed
+    - Gang role changed
+- On Gang Create (and vice versa for delete)
+  - Create filetree and set permissions
+  - Require leader member on creation
+  - Populate sheet with default data
+  - Fix color options
 
 ## Done
 - Pong a pinging user
+- Identify commands from admins
+- Update a remote roster (google sheets w/ pandas)

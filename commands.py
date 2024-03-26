@@ -1,11 +1,9 @@
-import os
-from discord import Interaction, Member
-from gspread_dataframe import set_with_dataframe
-import gspread
-import logger
-from sheets import connect
-from utility import get_power
+from discord import Interaction, Member, Role, Colour
+from sheets import get_worksheet, create_worksheet, delete_worksheet
+from utility import get_power, can_execute, new_role
+import string
 import pandas as pd
+import logger
 log = logger.Logger()
 
 def get_commands(tree, guild):
@@ -15,6 +13,10 @@ def get_commands(tree, guild):
         guild=guild,
     )
     async def ping(interaction: Interaction) -> None:
+        log.info("Command Received: ping")
+        if not can_execute(interaction.user, 1, None):
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
         await interaction.response.send_message("Pong!")
 
     @tree.command (
@@ -23,6 +25,10 @@ def get_commands(tree, guild):
         guild=guild,
     )
     async def pong(interaction: Interaction) -> None:
+        log.info("Command Received: pong")
+        if not can_execute(interaction.user, 1, None):
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
         await interaction.response.send_message("Ping!")
 
     @tree.command (
@@ -30,10 +36,21 @@ def get_commands(tree, guild):
         description="test sheets api",
         guild=guild,
     )
-    async def test(interaction: Interaction) -> None:
-        worksheet = await connect("Gang Bot DB")
+    async def test(interaction: Interaction, gang_role: Role) -> None:
+        """Does something
+
+        Parameters
+        -----------
+        gang_role: discord.Role
+            The role of the gang to get the roster for
+        """
+        log.info("Command Received: test")
+        if not can_execute(interaction.user, 2, None):
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
+        worksheet = get_worksheet(gang_role.name)
         if not worksheet:
-            await interaction.response.send_message("Sorry! I was unable to connect to the spreadsheet")
+            await interaction.response.send_message(f"There is no roster for {gang_role.name}\nThis is probably a major error, try to repair with `/repair`")
             return
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
@@ -42,7 +59,7 @@ def get_commands(tree, guild):
         # dataframe.iloc[3, 1] = int(dataframe.iloc[3, 1]) + 1 # type: ignore
         # set_with_dataframe(worksheet, dataframe)
         # dataframe.to_csv('data.txt', index=False)
-        
+
         await interaction.response.send_message('```' + dataframe.to_string() + '```')
 
     @tree.command (
@@ -58,9 +75,79 @@ def get_commands(tree, guild):
         member: discord.Member
             the member to interact with
         """
+        log.info("Command Received: user")
+        if not can_execute(interaction.user, 2, None):
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
         await interaction.response.send_message(get_power(member))
 
+    @tree.command (
+        name="create_gang",
+        description="Creates role, roster, and channels for a gang",
+        guild=guild,
+    )
+    async def create_gang(interaction: Interaction, gang_name: str, color_request: str = None) -> None:
+        """Creates all base resources for a gang including:
+        - Discord Role
+        - Roster
+        - Discord Channels
 
+        Parameters
+        -----------
+        gang_name: str
+            the name of the gang to create
+        color: str
+            the primary color of the gang in hex format (e.g. #000000, 000000)
+        """
+        log.info("Command Received: create_gang")
+        if not can_execute(interaction.user, 6, None):
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
+
+        gang_name = string.capwords(gang_name.strip())
+
+        worksheet = create_worksheet(gang_name)
+        if not worksheet:
+            await interaction.response.send_message("Failed to create worksheet")
+            return
+        dataframe = pd.DataFrame(worksheet.get_values()[1:], columns=worksheet.get_values()[0])
+
+        if not color_request:
+            color_request = Colour.default()
+
+        newRole = new_role(guild, gang_name, color_request)
+
+        if not newRole:
+            await interaction.response.send_message("Failed to create new role")
+            return
+
+        await interaction.response.send_message(f"```{dataframe}```\n@{newRole.name}")
+
+    @tree.command(
+        name="delete_gang",
+        description="Deletes role, roster, and channels for a gang",
+        guild=guild,
+    )
+    async def delete_gang(interaction: Interaction, gang_name: Role) -> None:
+        """Deletes everything associated with a gang, primarily:
+        - Discord Role
+        - Roster
+        - Discord Channels
+
+        Parameters
+        -----------
+        gang_name: Role
+            the role of the gang to delete
+        """
+        log.info("Command Received: delete_gang")
+        if not can_execute(interaction.user, 6, None):
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
+
+        if not delete_worksheet(gang_name.name):
+            await interaction.response.send_message("Failed to delete worksheet")
+            return
+        await interaction.response.send_message("Gang deleted successfully")
 
 # class LoginSheets(ui.Modal, title="login"):
 #     name = ui.TextInput(

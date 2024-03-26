@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
-from discord import Intents, Client, Object, app_commands
+from discord import Intents, Client, Guild, Object, app_commands
 from commands import get_commands
+from sheets import db_healthy
 
 # Import custom logger
 import logger
@@ -36,6 +37,9 @@ async def on_ready() -> None:
         log.fatal(f"Failed to start\n\n{e}\n\n")
 
 def main() -> None:
+    log.info("Running health checks...")
+    if not db_healthy():
+        exit()
     client.run(token=TOKEN)
 
 if __name__ == '__main__':
