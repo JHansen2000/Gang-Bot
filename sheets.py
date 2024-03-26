@@ -19,12 +19,12 @@ def db_healthy() -> bool:
         return False
 
     worksheets = __connect()
+    # This should never be true, checked in above function at start
+    if not spreadsheet:
+        return False
+    
     if not worksheets:
         log.fatal("Global spreadsheet not found")
-        return False
-
-    # This should never be true, checked in predecessor function
-    if not spreadsheet:
         return False
 
     try:
@@ -63,22 +63,22 @@ def __connect() -> list[str] | None:
 
 def get_worksheet(worksheetName: str) -> gspread.Worksheet | None:
     worksheets = __connect()
-    if not worksheets or worksheetName not in worksheets:
-        log.error(f"Cannot get - worksheet '{worksheetName}' does not exist")
+    # This should never be true, checked in above function at start
+    if not spreadsheet:
         return
     
-    # This should never be true, checked in predecessor function
-    if not spreadsheet:
+    if not worksheets or worksheetName not in worksheets:
+        log.error(f"Cannot get - worksheet '{worksheetName}' does not exist")
         return
     
     return spreadsheet.worksheet(worksheetName)
 
 def create_worksheet(worksheetName: str) -> gspread.Worksheet | None:
-    # This should never be true, checked in predecessor function
-    if not spreadsheet:
-        return
-
     worksheets = __connect()
+    # This should never be true, checked in above function at start
+    if not spreadsheet:
+        return 
+    
     if not worksheets or worksheetName in worksheets:
         log.error(f"Cannot create - worksheet '{worksheetName}' already exists")
         return spreadsheet.worksheet(worksheetName)
@@ -89,11 +89,11 @@ def create_worksheet(worksheetName: str) -> gspread.Worksheet | None:
         return
 
 def delete_worksheet(worksheetName: str) -> bool:
-    # This should never be true, checked in predecessor function
+    worksheets = __connect()
+    # This should never be true, checked in above function at start
     if not spreadsheet:
         return False
-
-    worksheets = __connect()
+    
     if not worksheets or worksheetName not in worksheets:
         log.warning(f"Cannot delete - worksheet '{worksheetName}' does not exist")
         return True
