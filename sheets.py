@@ -73,6 +73,9 @@ def get_worksheet(worksheetName: str) -> gspread.Worksheet | None:
     
     return spreadsheet.worksheet(worksheetName)
 
+def get_worksheets() -> list[str] | None:
+    return __connect()
+ 
 def create_worksheet(worksheetName: str) -> gspread.Worksheet | None:
     worksheets = __connect()
     # This should never be true, checked in above function at start

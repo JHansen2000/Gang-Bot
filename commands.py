@@ -1,5 +1,5 @@
 from discord import Interaction, Member, Role, Client, Object, app_commands
-from sheets import get_worksheet, create_worksheet, delete_worksheet
+from sheets import get_worksheet, create_worksheet, delete_worksheet, get_worksheets
 from utility import delete_role, get_guild, get_power, can_execute, new_role
 import string
 import pandas as pd
@@ -108,6 +108,11 @@ def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_i
 
         gang_name = string.capwords(gang_name.strip())
 
+        worksheets = get_worksheets()
+        if worksheets and gang_name in worksheets:
+            await interaction.response.send_message("Gang already exists")
+            return
+
         worksheet = create_worksheet(gang_name)
         if not worksheet:
             await interaction.response.send_message("Failed to create worksheet")
@@ -146,6 +151,11 @@ def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_i
         log.info("Command Received: delete_gang")
         if not can_execute(interaction.user, 6, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
+            return
+
+        worksheets = get_worksheets()
+        if not worksheets or gang_name.name not in worksheets:
+            await interaction.response.send_message("The provided role must be for a gang")
             return
 
         if not delete_worksheet(gang_name.name):
