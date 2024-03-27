@@ -1,12 +1,14 @@
-from discord import Interaction, Member, Role, Colour
+from discord import Interaction, Member, Role, Client, Object, app_commands
 from sheets import get_worksheet, create_worksheet, delete_worksheet
-from utility import get_power, can_execute, new_role
+from utility import delete_role, get_guild, get_power, can_execute, new_role
 import string
 import pandas as pd
 import logger
 log = logger.Logger()
 
-def get_commands(tree, guild):
+def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_id: int):
+    guild = Object(guild_id)
+
     @tree.command (
         name="ping",
         description="Ping Gang Bot!",
@@ -112,6 +114,11 @@ def get_commands(tree, guild):
             return
         dataframe = pd.DataFrame(worksheet.get_values()[1:], columns=worksheet.get_values()[0])
 
+        guild = await get_guild(client, guild_id)
+        if not guild:
+            await interaction.response.send_message("Failed to get guild")
+            return
+        
         newRole = await new_role(guild, gang_name, color_request)
 
         if not newRole:
@@ -144,6 +151,11 @@ def get_commands(tree, guild):
         if not delete_worksheet(gang_name.name):
             await interaction.response.send_message("Failed to delete worksheet")
             return
+        
+        if not await delete_role(gang_name):
+            await interaction.response.send_message("Failed to delete role")
+            return
+        
         await interaction.response.send_message("Gang deleted successfully")
 
 # class LoginSheets(ui.Modal, title="login"):

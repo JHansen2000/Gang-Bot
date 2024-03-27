@@ -18,6 +18,7 @@
   - Require leader member on creation
   - Populate sheet with default data
   - Fix color options
+  - Verify that role IS a gang
 
 ## Done
 - Pong a pinging user

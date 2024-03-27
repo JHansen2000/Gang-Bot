@@ -14,23 +14,28 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
     log.fatal("Unable to get DISCORD_TOKEN")
     exit()
+log.info(f"Loaded DISCORD_TOKEN - {TOKEN}")
 
-GUILD = os.getenv('GUILD_ID')
-if not GUILD:
+guild_id = os.getenv('GUILD_ID')
+if not guild_id:
     log.fatal("Unable to get GUILD_ID")
     exit()
-GUILD = Object(id=GUILD)
+guild_id = int(guild_id)
+log.info(f"Loaded GUILD_ID - {guild_id}")
+guild = Object(guild_id)
 
 # Declarations -> None
 intents: Intents = Intents.default()
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
-get_commands(tree, GUILD)
+get_commands(client, tree, guild_id)
+
 
 @client.event
 async def on_ready() -> None:
     try:
-        synced = await tree.sync(guild=GUILD)
+        guild = await client.fetch_guild(guild_id)
+        synced = await tree.sync(guild=guild)
         log.info(f"Synced {len(synced)} command(s)...")
         log.info(f"{client.user} is now running")
     except Exception as e:
