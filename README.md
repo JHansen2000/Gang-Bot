@@ -6,6 +6,9 @@
 - Share the spreadsheet with the `client_email` in private_key.json
 - `python3 main.py`
 
+## Current Task:
+- Fix deleting row from bot_data
+
 ## TODO
 - Create following event handlers:
   - User Nickname Change
@@ -19,6 +22,8 @@
   - Populate sheet with default data
   - Fix color options
   - Verify that role IS a gang
+- Log changes in #audit-log channel
+- Auto create 'bot_data' sheet on db_health_check if it doesn't exist
 
 ## Done
 - Pong a pinging user

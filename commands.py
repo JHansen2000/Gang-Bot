@@ -1,6 +1,6 @@
 from discord import Interaction, Member, Role, Client, Object, app_commands
 from sheets import get_worksheet, create_worksheet, delete_worksheet, get_worksheets
-from utility import delete_role, get_guild, get_power, can_execute, new_role
+from utility import delete_role, get_power, can_execute, new_role
 import string
 import pandas as pd
 import logger
@@ -50,12 +50,17 @@ def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_i
         if not can_execute(interaction.user, 2, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
-        worksheet = get_worksheet(gang_role.name)
+        # worksheet = get_worksheet(gang_role.name)
+        worksheet = get_worksheet("bot_data")
         if not worksheet:
             await interaction.response.send_message(f"There is no roster for {gang_role.name}\nThis is probably a major error, try to repair with `/repair`")
             return
+
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
+        # dataframe = dataframe[dataframe["ID"] != gang_role.id]
+        print(gang_role.id)
+        print(dataframe.loc[dataframe['ID'] != str(gang_role.id)])
 
         # dataframe = pd.read_csv("data.txt")
         # dataframe.iloc[3, 1] = int(dataframe.iloc[3, 1]) + 1 # type: ignore
@@ -108,36 +113,30 @@ def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_i
 
         gang_name = string.capwords(gang_name.strip())
 
-        worksheets = get_worksheets()
-        if worksheets and gang_name in worksheets:
-            await interaction.response.send_message("Gang already exists")
+        guild = interaction.guild
+        if not guild:
+            await interaction.response.send_message("Failed to get guild")
             return
 
-        worksheet = create_worksheet(gang_name)
+        newRole = await new_role(guild, gang_name, color_request)
+        if not newRole:
+            await interaction.response.send_message("Failed to create new role")
+            return
+
+        worksheet = create_worksheet(gang_name, newRole)
         if not worksheet:
             await interaction.response.send_message("Failed to create worksheet")
             return
         dataframe = pd.DataFrame(worksheet.get_values()[1:], columns=worksheet.get_values()[0])
 
-        guild = await get_guild(client, guild_id)
-        if not guild:
-            await interaction.response.send_message("Failed to get guild")
-            return
-        
-        newRole = await new_role(guild, gang_name, color_request)
-
-        if not newRole:
-            await interaction.response.send_message("Failed to create new role")
-            return
-
-        await interaction.response.send_message(f"```{dataframe}```\n@{newRole.name}")
+        await interaction.response.send_message(f"```{dataframe}```\n{newRole.mention}")
 
     @tree.command(
         name="delete_gang",
         description="Deletes role, roster, and channels for a gang",
         guild=guild,
     )
-    async def delete_gang(interaction: Interaction, gang_name: Role) -> None:
+    async def delete_gang(interaction: Interaction, gang_role: Role) -> None:
         """Deletes everything associated with a gang, primarily:
         - Discord Role
         - Roster
@@ -145,7 +144,7 @@ def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_i
 
         Parameters
         -----------
-        gang_name: Role
+        gang_role: Role
             the role of the gang to delete
         """
         log.info("Command Received: delete_gang")
@@ -154,18 +153,25 @@ def get_commands(client: Client, tree: app_commands.CommandTree[Client], guild_i
             return
 
         worksheets = get_worksheets()
-        if not worksheets or gang_name.name not in worksheets:
+
+        # This should never be true
+        if not worksheets:
+            return
+
+        sheetnames = [ws.title for ws in worksheets]
+
+        if not sheetnames or gang_role.name not in sheetnames:
             await interaction.response.send_message("The provided role must be for a gang")
             return
 
-        if not delete_worksheet(gang_name.name):
+        if not delete_worksheet(gang_role.name, gang_role):
             await interaction.response.send_message("Failed to delete worksheet")
             return
-        
-        if not await delete_role(gang_name):
+
+        if not await delete_role(gang_role):
             await interaction.response.send_message("Failed to delete role")
             return
-        
+
         await interaction.response.send_message("Gang deleted successfully")
 
 # class LoginSheets(ui.Modal, title="login"):

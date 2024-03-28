@@ -36,10 +36,6 @@ def can_execute(member: Member, required_power: int, target) -> bool:
   log.warning("User does not meet required power")
   return False
 
-async def get_guild(client: Client, guild_id: int) -> Guild:
-  guild = await client.fetch_guild(guild_id)
-  return guild
-
 async def new_role(guild: Guild, roleName: str, colorRequest: str | None) -> Role | None:
 
   if not colorRequest:
@@ -55,8 +51,7 @@ async def new_role(guild: Guild, roleName: str, colorRequest: str | None) -> Rol
         color = Colour.default()
 
   try:
-    print(guild)
-    newRole = await guild.create_role(name=roleName, color=color, hoist=True, mentionable=True) 
+    newRole = await guild.create_role(name=roleName, color=color, hoist=True, mentionable=True)
     log.info(f"Created new role @{newRole.name}")
     return newRole
   except Exception as e:
