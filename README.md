@@ -7,7 +7,9 @@
 - `python3 main.py`
 
 ## Current Task:
-- Fix deleting row from bot_data
+- On Gang Create (and vice versa for delete)
+  - Populate sheet with default data
+  - Create channel tree and set permissions
 
 ## TODO
 - Create following event handlers:
@@ -17,15 +19,17 @@
     - Command role changed
     - Gang role changed
 - On Gang Create (and vice versa for delete)
-  - Create filetree and set permissions
-  - Require leader member on creation
+  - Create channel tree and set permissions
+  - Require color hex on creation
+  - Optional leader (Must create alternative command)
   - Populate sheet with default data
-  - Fix color options
-  - Verify that role IS a gang
 - Log changes in #audit-log channel
-- Auto create 'bot_data' sheet on db_health_check if it doesn't exist
+
 
 ## Done
 - Pong a pinging user
 - Identify commands from admins
+- Auto create 'bot_data' sheet on db_health_check if it doesn't exist
 - Update a remote roster (google sheets w/ pandas)
+- On Gang Create (and vice versa for delete)
+  - Verify that role IS a gang

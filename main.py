@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from discord import Intents, Client, Guild, Object, app_commands
+from discord import Intents, Client, Object, app_commands
 from commands import get_commands
 from sheets import db_healthy
 
@@ -28,7 +28,7 @@ guild = Object(guild_id)
 intents: Intents = Intents.default()
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
-get_commands(client, tree, guild_id)
+get_commands(tree, guild)
 
 
 @client.event

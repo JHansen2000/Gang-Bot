@@ -10,6 +10,8 @@ log = logger.Logger()
 
 load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+# RID = Role ID, CID = Category ID, SID = Spreadsheet ID, MIDS= Member IDs (list)
+BOT_DATA_HEADERS = ["Name", "RID", "CID", "SID", "MIDS", "Created", "Modified"]
 
 spreadsheet: Spreadsheet | None = None
 
@@ -35,8 +37,15 @@ def db_healthy() -> bool:
 
     try:
         if "bot_data" not in sheetnames:
-             log.warning("bot_data sheet not found - creating...")
-             spreadsheet.add_worksheet(title="bot_data", rows=1000, cols=1000, index=len(sheetnames))
+            log.warning("bot_data sheet not found - creating...")
+            bot_data = spreadsheet.add_worksheet(
+                title="bot_data",
+                rows=1,
+                cols=len(BOT_DATA_HEADERS),
+                index=len(sheetnames))
+            dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
+            set_with_dataframe(bot_data, dataframe, resize=True)
+            log.info("bot_data sheet created")
         return True
 
     except Exception as e:
@@ -66,6 +75,35 @@ def __connect() -> list[Worksheet] | None:
     except Exception as e:
         log.error(f"Couldn't open the spreadsheet\n\n{e}")
         return
+
+def reset_spreadsheet() -> bool:
+    # This should never be true, checked in above function at start
+    if not spreadsheet:
+        return False
+
+    worksheets = spreadsheet.worksheets()
+
+    reqs = [
+        {"repeatCell": {
+            "range": {"sheetId": s.id},
+            "fields": "*"}}
+        if i == len(worksheets)-1 else
+        {"deleteSheet": {"sheetId": s.id}}
+        for i, s in enumerate(worksheets)]
+
+    try:
+        log.info("Deleting gang spreadsheets...")
+        spreadsheet.batch_update({"requests": reqs})
+        log.info("Resetting bot_data headers...")
+        bot_data = get_worksheet("bot_data")
+        dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
+        set_with_dataframe(bot_data, dataframe, resize=True)
+        log.info("Spreadsheet reset complete")
+        return True
+
+    except Exception as e:
+        log.error(f"Failed to reset database\n\n{e}")
+        return False
 
 def get_worksheet(worksheetName: str) -> Worksheet | None:
     # This should never be true, checked in above function at start
@@ -101,17 +139,17 @@ def create_worksheet(worksheetName: str, role : Role | None = None) -> Worksheet
             if not worksheet:
                 log.warning("Update worksheet 'bot_data' failed")
             else:
-                data = [str(role.id), role.name, role.members, len(role.members), date.today(), date.today()]
+                data = [role.name, str(role.id), None, None, role.members, date.today(), date.today()]
                 values = worksheet.get_values()
                 dataframe = pd.DataFrame(values[1:], columns=values[0])
                 dataframe.loc[len(dataframe)] = data
-                set_with_dataframe(worksheet, dataframe)
+                set_with_dataframe(worksheet, dataframe, resize=True)
                 log.info("Updated worksheet 'bot_data'")
 
         log.info(f"Attempting to create worksheet '{worksheetName}'...")
         newSheet = spreadsheet.add_worksheet(
             title=worksheetName,
-            rows=32,
+            rows=1,
             cols=len(COLUMNS),
             index=len(sheetnames) - 1)
         log.info(f"Created worksheet '{worksheetName}'")
@@ -144,7 +182,7 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
                 dataframe = pd.DataFrame(values[1:], columns=values[0])
                 dataframe = dataframe.loc[dataframe['ID'] != str(role.id)]
                 print(dataframe)
-                set_with_dataframe(worksheet, dataframe)
+                set_with_dataframe(worksheet, dataframe, resize=True)
                 log.info("Updated worksheet 'bot_data'")
 
         log.info(f"Attempting to delete worksheet '{worksheetName}'...")
