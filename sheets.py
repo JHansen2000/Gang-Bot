@@ -2,16 +2,20 @@ import os
 import pandas as pd
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
-from discord import Role
+from discord import Role, Member
 from dotenv import load_dotenv
 from datetime import date
+from utility import ROLES, get_power
 import logger
 log = logger.Logger()
 
 load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-# RID = Role ID, CID = Category ID, SID = Spreadsheet ID, MIDS= Member IDs (list)
-BOT_DATA_HEADERS = ["Name", "RID", "CID", "SID", "MIDS", "Created", "Modified"]
+# RID = Role ID, CID = Category ID, MIDS= Member IDs (list)
+BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDS", "Created", "Modified"]
+GANG_DATA_HEADERS = ["ID", "Name", "Rank"]
+LOCAL_ROLES = ROLES
+LOCAL_ROLES.pop("ADMIN")
 
 spreadsheet: Spreadsheet | None = None
 
@@ -121,7 +125,7 @@ def get_worksheet(worksheetName: str) -> Worksheet | None:
 def get_worksheets() -> list[Worksheet] | None:
     return __connect()
 
-def create_worksheet(worksheetName: str, role : Role | None = None) -> Worksheet | None:
+def create_worksheet(worksheetName: str, role : Role | None = None, member: Member | None = None) -> Worksheet | None:
     # This should never be true, checked in above function at start
     if not spreadsheet:
         return
@@ -132,27 +136,40 @@ def create_worksheet(worksheetName: str, role : Role | None = None) -> Worksheet
         return spreadsheet.worksheet(worksheetName)
 
     try:
-        COLUMNS = ["Name", ]
+        log.info(f"Attempting to create worksheet '{worksheetName}'...")
+        newSheet = spreadsheet.add_worksheet(
+            title=worksheetName,
+            rows=2,
+            cols=len(GANG_DATA_HEADERS),
+            index=len(sheetnames) - 1)
+        log.info(f"Created worksheet '{worksheetName}'")
+
+        dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
+        set_with_dataframe(newSheet, dataframe, resize=True)
+
+
+
+        if member:
+            name = member.nick if member.nick else member.name
+            rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member))]
+            member_data = [member.id, name, rank]
+            dataframe.loc[len(dataframe)] = member_data
+            set_with_dataframe(newSheet, dataframe, resize=True)
+
         if role:
             log.info("Attempting to update 'bot_data' worksheet...")
             worksheet = get_worksheet("bot_data")
             if not worksheet:
                 log.warning("Update worksheet 'bot_data' failed")
+
             else:
-                data = [role.name, str(role.id), None, None, role.members, date.today(), date.today()]
+                role_data = [role.name, str(role.id), None, role.members, date.today(), date.today()]
                 values = worksheet.get_values()
                 dataframe = pd.DataFrame(values[1:], columns=values[0])
-                dataframe.loc[len(dataframe)] = data
+                dataframe.loc[len(dataframe)] = role_data
                 set_with_dataframe(worksheet, dataframe, resize=True)
                 log.info("Updated worksheet 'bot_data'")
 
-        log.info(f"Attempting to create worksheet '{worksheetName}'...")
-        newSheet = spreadsheet.add_worksheet(
-            title=worksheetName,
-            rows=1,
-            cols=len(COLUMNS),
-            index=len(sheetnames) - 1)
-        log.info(f"Created worksheet '{worksheetName}'")
         return newSheet
 
     except Exception as e:
@@ -181,7 +198,6 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
                 values = worksheet.get_values()
                 dataframe = pd.DataFrame(values[1:], columns=values[0])
                 dataframe = dataframe.loc[dataframe['ID'] != str(role.id)]
-                print(dataframe)
                 set_with_dataframe(worksheet, dataframe, resize=True)
                 log.info("Updated worksheet 'bot_data'")
 
@@ -194,13 +210,17 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
         log.error(f"Delete worksheet '{worksheetName}' failed\n\n{e}")
         return False
 
+def update_bot_data() -> Worksheet:
+    return
+
 def gangInDB(role: Role) -> bool:
     worksheet = get_worksheet("bot_data")
     if not worksheet:
         log.error("Failed to get bot_data worksheet")
         return False
 
-    dataframe = pd.DataFrame(worksheet.get_values()[1:], columns=worksheet.get_values()[0])
+    values = worksheet.get_values()
+    dataframe = pd.DataFrame(values[1:], columns=values[0])
     print(dataframe)
     return True
 

@@ -8,22 +8,24 @@
 
 ## Current Task:
 - On Gang Create (and vice versa for delete)
-  - Populate sheet with default data
+  - Populate sheet with headers only
   - Create channel tree and set permissions
+- Update Bot Data command (role | none, category | none, etc.)
 
 ## TODO
 - Create following event handlers:
   - User Nickname Change
   - Role Color Modified
-  - User Role Change
-    - Command role changed
-    - Gang role changed
 - On Gang Create (and vice versa for delete)
   - Create channel tree and set permissions
   - Require color hex on creation
-  - Optional leader (Must create alternative command)
+  - Optional leader
   - Populate sheet with default data
 - Log changes in #audit-log channel
+- Map community rank to user-defined rank structure
+- Promote member
+- Demote member
+- Kick member
 
 
 ## Done
