@@ -26,6 +26,7 @@ guild = Object(guild_id)
 
 # Declarations -> None
 intents: Intents = Intents.default()
+intents.members = True
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
 get_commands(tree, guild)

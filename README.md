@@ -8,9 +8,7 @@
 
 ## Current Task:
 - On Gang Create (and vice versa for delete)
-  - Populate sheet with headers only
   - Create channel tree and set permissions
-- Update worksheet command (role | none, category | none, etc.)
 - Add mapping for roles to power for custom gang roles (creation definitely belongs in a modal)
 
 ## TODO
@@ -27,7 +25,8 @@
 - Promote member
 - Demote member
 - Kick member
-
+- On init, create and log roles if they don't exist
+- Change rank structure roles
 
 ## Done
 - Pong a pinging user
@@ -36,3 +35,5 @@
 - Update a remote roster (google sheets w/ pandas)
 - On Gang Create (and vice versa for delete)
   - Verify that role IS a gang
+  - Populate sheet with headers only
+- Update worksheet command (role | none, category | none, etc.)

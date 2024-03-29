@@ -1,12 +1,11 @@
-from discord import Client, Guild, Member, Role, Colour
+from discord import CategoryChannel, Client, Guild, Member, PermissionOverwrite, Role, Colour
 import logger
 log = logger.Logger()
 
 ROLES = {
-  "ADMIN": 6,
-  "Gang Leader" : 5,
-  "High Command": 4,
-  "Low Command": 3,
+  "ADMIN": 5,
+  "Gang Leader" : 4,
+  "High Command": 3,
   "Member": 2,
   "Hangaround": 1
 }
@@ -66,3 +65,40 @@ async def delete_role(role: Role) -> bool:
   except Exception as e:
     log.error(f"Failed to delete role @{role.name}\n\n{e}")
     return False
+
+async def new_category(guild: Guild, role: Role) -> CategoryChannel | None:
+  categories = [category.name for category in guild.categories]
+  categories.append(role.name)
+  categories.sort()
+
+  newCategory = await guild.create_category(
+    role.name,
+    overwrites= {
+      guild.default_role: PermissionOverwrite(read_messages=False),
+      role: PermissionOverwrite(read_messages=True)
+    },
+    position=categories.index(role.name))
+
+  return newCategory
+
+async def get_category(guild: Guild, cid: str) -> CategoryChannel | None:
+  category = [cat for cat in guild.categories if str(cat.id == cid)][0]
+  if not category:
+    log.error("Failed to find category")
+    return
+  return category
+
+async def delete_category(guild: Guild, cid: str) -> bool:
+  category = await get_category(guild, cid)
+  if not category:
+      return False
+
+  channels = category.channels
+  for channel in channels:
+    try:
+      await channel.delete()
+    except Exception as e:
+      log.error(f"Failed to delete channel {channel.name}\n\n{e}")
+      pass
+  await category.delete()
+  return True

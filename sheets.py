@@ -125,7 +125,7 @@ def get_worksheet(worksheetName: str) -> Worksheet | None:
 def get_worksheets() -> list[Worksheet] | None:
     return __connect()
 
-def create_worksheet(worksheetName: str, role : Role | None = None, member: Member | None = None) -> Worksheet | None:
+def create_worksheet(worksheetName: str) -> Worksheet | None:
     # This should never be true, checked in above function at start
     if not spreadsheet:
         return
@@ -146,31 +146,6 @@ def create_worksheet(worksheetName: str, role : Role | None = None, member: Memb
 
         dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
         set_with_dataframe(newSheet, dataframe, resize=True)
-
-
-
-        if member:
-            name = member.nick if member.nick else member.name
-            rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member))]
-            member_data = [member.id, name, rank]
-            dataframe.loc[len(dataframe)] = member_data
-            set_with_dataframe(newSheet, dataframe, resize=True)
-
-        if role:
-            log.info("Attempting to update 'bot_data' worksheet...")
-            worksheet = get_worksheet("bot_data")
-            if not worksheet:
-                log.warning("Update worksheet 'bot_data' failed")
-
-            else:
-                role_data = [role.name, str(role.id), None, role.members, date.today(), date.today()]
-                values = worksheet.get_values()
-                dataframe = pd.DataFrame(values[1:], columns=values[0])
-                dataframe.loc[len(dataframe)] = role_data
-                print(dataframe)
-                set_with_dataframe(worksheet, dataframe, resize=True)
-                log.info("Updated worksheet 'bot_data'")
-
         return newSheet
 
     except Exception as e:
@@ -211,41 +186,90 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
         log.error(f"Delete worksheet '{worksheetName}' failed\n\n{e}")
         return False
 
-def update_worksheet(worksheet: Worksheet, 
-                    member: Member | None = None, 
-                    role: Role | None = None, 
-                    category: CategoryChannel | None = None) -> Worksheet | None:
+def update_worksheet(worksheet: Worksheet,
+                    member: Member | None = None,
+                    role: Role | None = None,
+                    category: CategoryChannel | None = None) -> Worksheet:
     try:
         log.info(f"Updating worksheet '{worksheet.title}'...")
 
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
-        print(values, dataframe)
 
         if member:
+            log.info("Updating with member data...")
+            if get_power(member, LOCAL_ROLES) < 1:
+                log.error(f"User doesn't have a role")
+                return worksheet
+
+            if GANG_DATA_HEADERS != dataframe.columns.tolist():
+                log.error(f"'{worksheet.title}' does not have the correct headers for member modification. Was the wrong sheet sent?")
+                return worksheet
+
             mid = str(member.id)
             name = member.nick if member.nick else member.name
             rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
-            if not dataframe.loc[dataframe["ID"]].empty:
-                print("FOUND")
-            else:
-                member_data = [mid, name, rank]
-                dataframe.loc[len(dataframe)] = member_data
-            
+            member_data = [mid, name, rank]
+
+            row_index = dataframe.index[dataframe['ID'] == mid].tolist()
+            if len(row_index) < 1:
+                log.info(f"Member {name} is new to '{worksheet.title}'")
+                row_index = len(dataframe)
+            dataframe.loc[row_index] = member_data
+
             log.info(f"'{worksheet.title}' updated with member data")
 
-        if role:
-            log.info(f"'{worksheet.title}' updated with role data")
+        if not role or not category:
+            log.error("Missing role or category in call")
+            return worksheet
 
-        if category:
-            log.info(f"'{worksheet.title}' updated with category data")
+        else:
+            if BOT_DATA_HEADERS != dataframe.columns.tolist():
+                log.error(f"'{worksheet.title}' does not have the correct headers for role modification. Was the wrong sheet sent?")
+                return worksheet
+
+            name = role.name
+            rid = str(role.id)
+            mids = [member.id for member in role.members]
+            modified = date.today()
+            cid = str(category.id)
+
+            row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
+            if len(row_index) < 1:
+                log.info(f"Role {role.name} is new to '{worksheet.title}'")
+                row_index = len(dataframe)
+                created = modified
+            else:
+                created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
+
+            role_data = [name, rid, cid, mids, created, modified]
+            dataframe.loc[row_index] = role_data
+
+            log.info(f"'{worksheet.title}' updated with role and category data")
 
         set_with_dataframe(worksheet, dataframe, resize=True)
         return worksheet
-    
+
     except Exception as e:
         log.error(f"Something went wrong while updating the worksheet\n\n{e}")
-        return None
+        return worksheet
+
+def get_category_id(role: Role) -> str | None:
+    log.info(f"Getting CID for '{role.name}'...")
+
+    worksheet = get_worksheet('bot_data')
+    if not worksheet:
+        return
+    try:
+        values = worksheet.get_values()
+        dataframe = pd.DataFrame(values[1:], columns=values[0])
+        cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
+
+        log.info(f"Found CID: {cid}")
+        return cid
+    except:
+        log.error(f"Something went wrong getting CID")
+        return
 
 def gangInDB(role: Role) -> bool:
     worksheet = get_worksheet("bot_data")
