@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
-from discord import Role, Member
+from discord import Role, Member, CategoryChannel
 from dotenv import load_dotenv
 from datetime import date
 from utility import ROLES, get_power
@@ -14,7 +14,7 @@ SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 # RID = Role ID, CID = Category ID, MIDS= Member IDs (list)
 BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDS", "Created", "Modified"]
 GANG_DATA_HEADERS = ["ID", "Name", "Rank"]
-LOCAL_ROLES = ROLES
+LOCAL_ROLES = ROLES.copy()
 LOCAL_ROLES.pop("ADMIN")
 
 spreadsheet: Spreadsheet | None = None
@@ -144,7 +144,7 @@ def create_worksheet(worksheetName: str, role : Role | None = None, member: Memb
             index=len(sheetnames) - 1)
         log.info(f"Created worksheet '{worksheetName}'")
 
-        dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
+        dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
         set_with_dataframe(newSheet, dataframe, resize=True)
 
 
@@ -167,6 +167,7 @@ def create_worksheet(worksheetName: str, role : Role | None = None, member: Memb
                 values = worksheet.get_values()
                 dataframe = pd.DataFrame(values[1:], columns=values[0])
                 dataframe.loc[len(dataframe)] = role_data
+                print(dataframe)
                 set_with_dataframe(worksheet, dataframe, resize=True)
                 log.info("Updated worksheet 'bot_data'")
 
@@ -197,7 +198,7 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
             else:
                 values = worksheet.get_values()
                 dataframe = pd.DataFrame(values[1:], columns=values[0])
-                dataframe = dataframe.loc[dataframe['ID'] != str(role.id)]
+                dataframe = dataframe.loc[dataframe['RID'] != str(role.id)]
                 set_with_dataframe(worksheet, dataframe, resize=True)
                 log.info("Updated worksheet 'bot_data'")
 
@@ -210,8 +211,41 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
         log.error(f"Delete worksheet '{worksheetName}' failed\n\n{e}")
         return False
 
-def update_bot_data() -> Worksheet:
-    return
+def update_worksheet(worksheet: Worksheet, 
+                    member: Member | None = None, 
+                    role: Role | None = None, 
+                    category: CategoryChannel | None = None) -> Worksheet | None:
+    try:
+        log.info(f"Updating worksheet '{worksheet.title}'...")
+
+        values = worksheet.get_values()
+        dataframe = pd.DataFrame(values[1:], columns=values[0])
+        print(values, dataframe)
+
+        if member:
+            mid = str(member.id)
+            name = member.nick if member.nick else member.name
+            rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+            if not dataframe.loc[dataframe["ID"]].empty:
+                print("FOUND")
+            else:
+                member_data = [mid, name, rank]
+                dataframe.loc[len(dataframe)] = member_data
+            
+            log.info(f"'{worksheet.title}' updated with member data")
+
+        if role:
+            log.info(f"'{worksheet.title}' updated with role data")
+
+        if category:
+            log.info(f"'{worksheet.title}' updated with category data")
+
+        set_with_dataframe(worksheet, dataframe, resize=True)
+        return worksheet
+    
+    except Exception as e:
+        log.error(f"Something went wrong while updating the worksheet\n\n{e}")
+        return None
 
 def gangInDB(role: Role) -> bool:
     worksheet = get_worksheet("bot_data")

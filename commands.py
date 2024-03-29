@@ -51,16 +51,28 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
         description="test sheets api",
         guild=guild,
     )
-    async def test(interaction: Interaction) -> None:
+    async def test(interaction: Interaction, member: Member) -> None:
+        """Testing command
+
+        Parameters
+        -----------
+        member: discord.Member
+            testing parameter
+        """
         log.info("Command Received: test")
 
         if not utility.can_execute(interaction.user, 2, None): # type: ignore
             await interaction.response.send_message("You do not have permission to use this command")
             return
 
-        worksheet = sheets.get_worksheet("bot_data")
+        worksheet = sheets.get_worksheet("The Oni")
         if not worksheet:
             await interaction.response.send_message(f"Could not find bot_data sheet")
+            return
+        
+        worksheet = sheets.update_worksheet(worksheet, member)
+        if not worksheet:
+            await interaction.response.send_message("failed")
             return
 
         values = worksheet.get_values()

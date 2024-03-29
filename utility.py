@@ -11,11 +11,11 @@ ROLES = {
   "Hangaround": 1
 }
 
-def get_power(member: Member) -> int:
+def get_power(member: Member, roles: dict[str, int] = ROLES) -> int:
   power = 0
   for role in member.roles:
-    if role.name in ROLES:
-      role_power = ROLES.get(role.name)
+    if role.name in roles:
+      role_power = roles.get(role.name)
       if role_power:
         power = max(role_power, power)
   return power
