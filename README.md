@@ -10,7 +10,8 @@
 - On Gang Create (and vice versa for delete)
   - Populate sheet with headers only
   - Create channel tree and set permissions
-- Update Bot Data command (role | none, category | none, etc.)
+- Update worksheet command (role | none, category | none, etc.)
+- Add mapping for roles to power for custom gang roles (creation definitely belongs in a modal)
 
 ## TODO
 - Create following event handlers:
