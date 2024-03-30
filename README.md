@@ -37,3 +37,8 @@
   - Verify that role IS a gang
   - Populate sheet with headers only
 - Update worksheet command (role | none, category | none, etc.)
+
+## Ideas
+- Custom tags for positions
+  - Can I hide roles? No
+- 
