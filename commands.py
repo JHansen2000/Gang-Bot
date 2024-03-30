@@ -38,10 +38,10 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
 
         await interaction.response.send_message(res)
 
-    @tree.command (
+    parent = app_commands.Group(name="ping", description="...")
+    @parent.command (
         name="ping",
         description="Ping Gang Bot!",
-        guild=guild,
     )
     async def ping(interaction: Interaction) -> None:
         log.info("Command Received: ping")
@@ -50,6 +50,19 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
             await interaction.response.send_message("You do not have permission to use this command")
             return
         await interaction.response.send_message("Pong!")
+
+    @parent.command (
+        name="pong",
+        description="Ping Gang Bot!",
+    )
+    async def pong(interaction: Interaction) -> None:
+        log.info("Command Received: pong")
+
+        if not utility.can_execute(interaction.user, 1, None): # type: ignore
+            await interaction.response.send_message("You do not have permission to use this command")
+            return
+        await interaction.response.send_message("Ping!")
+    tree.add_command(parent, guild=guild)
 
     @tree.command (
         name="delete_data",
