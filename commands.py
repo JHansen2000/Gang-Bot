@@ -83,10 +83,10 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
 
     data_com = discord.app_commands.Group(name="data", description="...")
     @data_com.command (
-        name="delete_data",
+        name="delete",
         description="Delete Gang Bot's entire database",
     )
-    async def delete_data(interaction: discord.Interaction) -> None:
+    async def data_delete(interaction: discord.Interaction) -> None:
         try:
             log.info("Command Received: /data delete")
             await interaction.response.defer()
@@ -149,7 +149,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         name="create",
         description="Creates role, roster, and channels for a gang",
     )
-    async def create(interaction: discord.Interaction, gang_name: str, color_request: str | None = None) -> None:
+    async def gang_create(interaction: discord.Interaction, gang_name: str, color_request: str | None = None) -> None:
         """Creates all base resources for a gang including:
         - Discord Role
         - Roster
@@ -194,7 +194,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         name="delete",
         description="Deletes role, roster, and channels for a gang",
     )
-    async def delete(interaction: discord.Interaction, role: discord.Role) -> None:
+    async def gang_delete(interaction: discord.Interaction, role: discord.Role) -> None:
         """Deletes everything associated with a gang, primarily:
         - Discord Role
         - Roster
