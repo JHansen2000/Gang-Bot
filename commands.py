@@ -146,10 +146,10 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
 
     gang_com = discord.app_commands.Group(name="gang", description="...")
     @gang_com.command (
-        name="create_gang",
+        name="create",
         description="Creates role, roster, and channels for a gang",
     )
-    async def create_gang(interaction: discord.Interaction, gang_name: str, color_request: str | None = None) -> None:
+    async def create(interaction: discord.Interaction, gang_name: str, color_request: str | None = None) -> None:
         """Creates all base resources for a gang including:
         - Discord Role
         - Roster
@@ -191,10 +191,10 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             raise e
 
     @gang_com.command(
-        name="delete_gang",
+        name="delete",
         description="Deletes role, roster, and channels for a gang",
     )
-    async def delete_gang(interaction: discord.Interaction, role: discord.Role) -> None:
+    async def delete(interaction: discord.Interaction, role: discord.Role) -> None:
         """Deletes everything associated with a gang, primarily:
         - Discord Role
         - Roster
