@@ -109,7 +109,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         name="refresh",
         description="refresh sheets db and return new sheet",
     )
-    async def refresh(interaction: discord.Interaction, role: discord.Role) -> None:
+    async def data_refresh(interaction: discord.Interaction, role: discord.Role) -> None:
         """Refresh the gang database to pick up any new changes
 
         Parameters
@@ -131,6 +131,8 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             cid = sheets.get_category_id(role)
             guild = interaction.guild
             if not guild: raise Exception("Could not get guild")
+
+            # need to update gang worksheet here
 
             dataframe = sheets.get_as_dataframe(
                 sheets.update_worksheet(

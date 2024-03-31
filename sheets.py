@@ -13,7 +13,7 @@ load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 # RID = Role ID, CID = Category ID, MIDS= Member IDs (list)
 BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDS", "Created", "Modified"]
-GANG_DATA_HEADERS = ["ID", "Name", "Rank"]
+GANG_DATA_HEADERS = ["ID", "Name", "Rank", "IBAN"]
 LOCAL_ROLES = ROLES.copy()
 LOCAL_ROLES.pop("ADMIN")
 
@@ -90,7 +90,6 @@ def create_worksheet(worksheetName: str) -> Worksheet:
     sheetnames = [ws.title for ws in get_worksheets()]
     if not sheetnames or worksheetName in sheetnames:
         raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
-
     try:
         log.info(f"Attempting to create worksheet '{worksheetName}'...")
         newSheet = spreadsheet.add_worksheet(
@@ -153,12 +152,17 @@ def update_worksheet(worksheet: Worksheet,
             mid = str(member.id)
             name = member.nick if member.nick else member.name
             rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
-            member_data = [mid, name, rank]
+            
+            
 
             row_index = dataframe.index[dataframe['ID'] == mid].tolist()
             if len(row_index) < 1:
                 log.info(f"Member {name} is new to '{worksheet.title}'")
+                iban = None
                 row_index = len(dataframe)
+            else:
+                iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"][0]
+            member_data = [mid, name, rank, iban]
             dataframe.loc[row_index] = member_data
 
             log.info(f"'{worksheet.title}' updated with member data")
