@@ -182,8 +182,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             newRole = await utility.new_role(guild, gang_name, color_request)
             newCategory = await utility.new_category(guild, newRole)
             sheets.create_worksheet(gang_name) # Returns worksheet
-            bot_data = sheets.get_worksheet('bot_data')
-            dataframe = sheets.get_as_dataframe(sheets.update_worksheet(bot_data, role=newRole, category=newCategory))
+            dataframe = sheets.get_as_dataframe(sheets.update_data_worksheet(newRole, newCategory))
             await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {newCategory.mention}")
 
         except Exception as e:

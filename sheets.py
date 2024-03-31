@@ -1,4 +1,5 @@
 import os
+from numpy import str_
 import pandas as pd
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
@@ -122,6 +123,82 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> None:
         spreadsheet.del_worksheet(get_worksheet(worksheetName))
         log.info(f"Deleted worksheet '{worksheetName}'")
         return
+
+    except Exception as e:
+        raise e
+
+def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -> Worksheet:
+    try:
+        log.info(f"Updating worksheet 'bot_data'...")
+        worksheet = get_worksheet('bot_data')
+        dataframe = get_as_dataframe(worksheet)
+
+        if BOT_DATA_HEADERS != dataframe.columns.tolist():
+                raise Exception(f"'bot_data' does not have the correct headers")
+
+        name = role.name
+        rid = str(role.id)
+        mids = [mem.id for mem in role.members]
+        modified = date.today()
+        if category:
+            cid = str(category.id)
+        else:
+            cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
+
+        row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
+        if len(row_index) < 1:
+            log.info(f"Role {role.name} is new to '{worksheet.title}'")
+            row_index = len(dataframe)
+            created = modified
+        else:
+            created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
+
+        role_data = [name, rid, cid, mids, created, modified]
+        dataframe.loc[row_index] = role_data
+
+        set_with_dataframe(worksheet, dataframe, resize=True)
+        log.info("Update successful")
+        return worksheet
+    
+    except Exception as e:
+        raise e
+
+def update_gang_worksheet(sheetname: str, member: Member, delete: bool) -> Worksheet:
+    try:
+        log.info(f"Updating worksheet '{sheetname}'...")
+        worksheet = get_worksheet(sheetname)
+        dataframe = get_as_dataframe(worksheet)
+
+        if GANG_DATA_HEADERS != dataframe.columns.tolist():
+            raise Exception(f"'{sheetname}' does not have the correct headers")
+
+        if delete:
+            dataframe = dataframe.loc[dataframe['ID'] != str(member.id)]
+            set_with_dataframe(worksheet, dataframe, resize=True)
+            log.info("Update successful")
+            return worksheet
+
+        if get_power(member, LOCAL_ROLES) < 1:
+            raise Exception(f"User doesn't have a role")
+
+        mid = str(member.id)
+        name = member.nick if member.nick else member.name
+        rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+
+        row_index = dataframe.index[dataframe['ID'] == mid].tolist()
+        if len(row_index) < 1:
+            log.info(f"Member {name} is new to '{sheetname}'")
+            row_index = len(dataframe)
+            iban = "None"
+        else:
+            iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].to_string().split()[1]
+
+        member_data = [mid, name, rank, iban]
+        dataframe.loc[row_index] = member_data
+
+        set_with_dataframe(worksheet, dataframe, resize=True)
+        log.info("Update successful")
+        return worksheet
 
     except Exception as e:
         raise e

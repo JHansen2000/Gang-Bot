@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from discord import Intents, Client, Object, app_commands
 from commands import get_commands
 from sheets import db_healthy
+from events import get_events
 
 # Import custom logger
 import logger
@@ -30,6 +31,7 @@ intents.members = True
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
 get_commands(tree, guild)
+get_events(client)
 
 
 @client.event
