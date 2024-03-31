@@ -43,10 +43,12 @@ async def on_ready() -> None:
         log.fatal(f"Failed to start\n\n{e}\n\n")
 
 def main() -> None:
-    log.info("Running health checks...")
-    if not db_healthy():
-        exit()
-    client.run(token=TOKEN)
+    try:
+        log.info("Running health checks...")
+        db_healthy()
+        client.run(token=TOKEN)
+    except Exception as e:
+        raise e
 
 if __name__ == '__main__':
     main()

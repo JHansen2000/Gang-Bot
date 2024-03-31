@@ -17,28 +17,20 @@ GANG_DATA_HEADERS = ["ID", "Name", "Rank"]
 LOCAL_ROLES = ROLES.copy()
 LOCAL_ROLES.pop("ADMIN")
 
-spreadsheet: Spreadsheet | None = None
+if not SPREADSHEET_ID:
+            raise Exception("Unable to get SPREADSHEET_ID")
+spreadsheet: Spreadsheet = service_account(filename="private/private_key.json") \
+                  .open_by_key(SPREADSHEET_ID)
 
-def db_healthy() -> bool:
+def db_healthy() -> None:
     if "private_key.json" not in os.listdir("private/"):
-        log.fatal("private_key.json not found in the private/ directory")
-        return False
+        raise Exception("private_key.json not found in the private/ directory")
 
-    if not SPREADSHEET_ID:
-        log.fatal("Unable to get SPREADSHEET_ID")
-        return False
-
-    worksheets = __connect()
-    # This should never be true, checked in above function at start
-    if not spreadsheet:
-        return False
-
+    worksheets = get_worksheets()
     if not worksheets:
-        log.fatal("Global spreadsheet not found")
-        return False
+        raise Exception("Global spreadsheet not found")
 
     sheetnames = [ws.title for ws in spreadsheet.worksheets()]
-
     try:
         if "bot_data" not in sheetnames:
             log.warning("bot_data sheet not found - creating...")
@@ -50,42 +42,22 @@ def db_healthy() -> bool:
             dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
             set_with_dataframe(bot_data, dataframe, resize=True)
             log.info("bot_data sheet created")
-        return True
+        return
 
     except Exception as e:
-        log.fatal(f"Couldn't open spreadsheet ({SPREADSHEET_ID})\n\n{e}")
-        return False
+        raise e
 
-def __connect() -> list[Worksheet] | None:
+def get_worksheets() -> list[Worksheet]:
     try:
-        global spreadsheet
-
-        if not SPREADSHEET_ID:
-            log.fatal("Unable to get SPREADSHEET_ID")
-            return
-
-        spreadsheet = service_account(filename="private/private_key.json") \
-                  .open_by_key(SPREADSHEET_ID)
-        if not spreadsheet:
-            log.fatal("Global spreadsheet not found")
-            return
-
-        log.info(f"Connected to spreadsheet {spreadsheet.id} ({spreadsheet.title})")
-
         worksheets = [ws.title for ws in spreadsheet.worksheets()]
         log.info(f"Found worksheets - {worksheets}")
         return spreadsheet.worksheets()
 
     except Exception as e:
-        log.error(f"Couldn't open the spreadsheet\n\n{e}")
-        return
+        raise e
 
-def reset_spreadsheet() -> bool:
-    # This should never be true, checked in above function at start
-    if not spreadsheet:
-        return False
-
-    worksheets = spreadsheet.worksheets()
+def reset_spreadsheet() -> None:
+    worksheets = get_worksheets()
 
     reqs = [
         {"repeatCell": {
@@ -103,37 +75,21 @@ def reset_spreadsheet() -> bool:
         dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
         set_with_dataframe(bot_data, dataframe, resize=True)
         log.info("Spreadsheet reset complete")
-        return True
+        return
 
     except Exception as e:
-        log.error(f"Failed to reset database\n\n{e}")
-        return False
+        raise e
 
-def get_worksheet(worksheetName: str) -> Worksheet | None:
-    # This should never be true, checked in above function at start
-    if not spreadsheet:
-        return
-
+def get_worksheet(worksheetName: str) -> Worksheet:
     sheetnames = [ws.title for ws in spreadsheet.worksheets()]
-
     if not sheetnames or worksheetName not in sheetnames:
-        log.error(f"Cannot get - worksheet '{worksheetName}' does not exist")
-        return
-
+        raise Exception(f"Cannot get - worksheet '{worksheetName}' does not exist")
     return spreadsheet.worksheet(worksheetName)
 
-def get_worksheets() -> list[Worksheet] | None:
-    return __connect()
-
-def create_worksheet(worksheetName: str) -> Worksheet | None:
-    # This should never be true, checked in above function at start
-    if not spreadsheet:
-        return
-
-    sheetnames = [ws.title for ws in spreadsheet.worksheets()]
+def create_worksheet(worksheetName: str) -> Worksheet:
+    sheetnames = [ws.title for ws in get_worksheets()]
     if not sheetnames or worksheetName in sheetnames:
-        log.error(f"Cannot create - worksheet '{worksheetName}' already exists")
-        return spreadsheet.worksheet(worksheetName)
+        raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
 
     try:
         log.info(f"Attempting to create worksheet '{worksheetName}'...")
@@ -149,19 +105,9 @@ def create_worksheet(worksheetName: str) -> Worksheet | None:
         return newSheet
 
     except Exception as e:
-        log.error(f"Create worksheet '{worksheetName}' failed\n\n{e}")
-        return
+        raise e
 
-def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
-    # This should never be true, checked in above function at start
-    if not spreadsheet:
-        return False
-
-    sheetnames = [ws.title for ws in spreadsheet.worksheets()]
-    if not sheetnames or worksheetName not in sheetnames:
-        log.warning(f"Cannot delete - worksheet '{worksheetName}' does not exist")
-        return True
-
+def delete_worksheet(worksheetName: str, role: Role | None = None) -> None:
     try:
         if role:
             log.info("Attempting to update worksheet 'bot_data' ...")
@@ -180,11 +126,10 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> bool:
         log.info(f"Attempting to delete worksheet '{worksheetName}'...")
         spreadsheet.del_worksheet(get_worksheet(worksheetName))
         log.info(f"Deleted worksheet '{worksheetName}'")
-        return True
+        return
 
     except Exception as e:
-        log.error(f"Delete worksheet '{worksheetName}' failed\n\n{e}")
-        return False
+        raise e
 
 def update_worksheet(worksheet: Worksheet,
                     member: Member | None = None,
@@ -199,12 +144,11 @@ def update_worksheet(worksheet: Worksheet,
         if member:
             log.info("Updating with member data...")
             if get_power(member, LOCAL_ROLES) < 1:
-                log.error(f"User doesn't have a role")
-                return worksheet
+                raise Exception(f"User doesn't have a role")
+
 
             if GANG_DATA_HEADERS != dataframe.columns.tolist():
-                log.error(f"'{worksheet.title}' does not have the correct headers for member modification. Was the wrong sheet sent?")
-                return worksheet
+                raise Exception(f"'{worksheet.title}' does not have the correct headers for member modification. Was the wrong sheet sent?")
 
             mid = str(member.id)
             name = member.nick if member.nick else member.name
@@ -220,13 +164,10 @@ def update_worksheet(worksheet: Worksheet,
             log.info(f"'{worksheet.title}' updated with member data")
 
         if not role or not category:
-            log.error("Missing role or category in call")
-            return worksheet
-
+            raise Exception("Missing role or category in call")
         else:
             if BOT_DATA_HEADERS != dataframe.columns.tolist():
-                log.error(f"'{worksheet.title}' does not have the correct headers for role modification. Was the wrong sheet sent?")
-                return worksheet
+                raise Exception(f"'{worksheet.title}' does not have the correct headers for role modification. Was the wrong sheet sent?")
 
             name = role.name
             rid = str(role.id)
@@ -251,15 +192,11 @@ def update_worksheet(worksheet: Worksheet,
         return worksheet
 
     except Exception as e:
-        log.error(f"Something went wrong while updating the worksheet\n\n{e}")
-        return worksheet
+        raise e
 
-def get_category_id(role: Role) -> str | None:
+def get_category_id(role: Role) -> str:
     log.info(f"Getting CID for '{role.name}'...")
-
     worksheet = get_worksheet('bot_data')
-    if not worksheet:
-        return
     try:
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
@@ -267,19 +204,24 @@ def get_category_id(role: Role) -> str | None:
 
         log.info(f"Found CID: {cid}")
         return cid
-    except:
-        log.error(f"Something went wrong getting CID")
-        return
+    
+    except Exception as e:
+        raise e
 
-def gangInDB(role: Role) -> bool:
-    worksheet = get_worksheet("bot_data")
-    if not worksheet:
-        log.error("Failed to get bot_data worksheet")
-        return False
-
+def get_as_dataframe(worksheet: Worksheet) -> pd.DataFrame:
     values = worksheet.get_values()
     dataframe = pd.DataFrame(values[1:], columns=values[0])
-    print(dataframe)
-    return True
+    return dataframe
+
+# def gangInDB(role: Role) -> bool:
+#     worksheet = get_worksheet("bot_data")
+#     if not worksheet:
+#         log.error("Failed to get bot_data worksheet")
+#         return False
+
+#     values = worksheet.get_values()
+#     dataframe = pd.DataFrame(values[1:], columns=values[0])
+#     print(dataframe)
+#     return True
 
 # https://github.com/robin900/gspread-dataframe

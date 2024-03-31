@@ -1,21 +1,21 @@
-from code import interact
-from discord import CategoryChannel, Interaction, Member, Role, Client, Object, app_commands
+import discord
+import gspread
 import discord.utils
 import sheets
 import utility
 import string
 import pandas as pd
+
 import logger
 log = logger.Logger()
 
-def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
-
+def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: discord.Object):
     @tree.command (
         name="test",
         description="refresh sheets db and return new sheet",
         guild=guild,
     )
-    async def test(interaction: Interaction, role: Role) -> None:
+    async def test(interaction: discord.Interaction, role: discord.Role) -> None:
         """Testing command
 
         Parameters
@@ -23,79 +23,94 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
         role: discord.Role
             testing parameter
         """
-        log.info("Command Received: test")
+        try:
+            log.info("Command Received: /test")
+            await interaction.response.defer()
 
-        if not utility.can_execute(interaction.user, 2, None): # type: ignore
-            await interaction.response.send_message("You do not have permission to use this command")
-            return
+            if not utility.can_execute(interaction.user, 2, None): # type: ignore
+                await interaction.followup.send("You do not have permission to use this command")
+                return
 
-        guild = interaction.guild
-        if not guild:
-            await interaction.response.send_message("failed")
-            return
+            guild = interaction.guild
+            if not guild:
+                await interaction.followup.send("failed")
+                return
 
-        res = sheets.get_category_id(role)
+            res = sheets.get_category_id(role)
+            await interaction.followup.send(res)
 
-        await interaction.response.send_message(res)
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
 
-    parent = app_commands.Group(name="ping", description="...")
-    @parent.command (
+    pingpong = discord.app_commands.Group(name="ping", description="...")
+    @pingpong.command (
         name="ping",
         description="Ping Gang Bot!",
     )
-    async def ping(interaction: Interaction) -> None:
-        log.info("Command Received: ping")
+    async def ping(interaction: discord.Interaction) -> None:
+        try:
+            log.info("Command Received: /ping ping")
+            await interaction.response.defer()
 
-        if not utility.can_execute(interaction.user, 1, None): # type: ignore
-            await interaction.response.send_message("You do not have permission to use this command")
-            return
-        await interaction.response.send_message("Pong!")
+            if not utility.can_execute(interaction.user, 1, None): # type: ignore
+                await interaction.followup.send("You do not have permission to use this command")
+                return
+            await interaction.followup.send("Pong!")
+        
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
 
-    @parent.command (
+    @pingpong.command (
         name="pong",
         description="Ping Gang Bot!",
     )
-    async def pong(interaction: Interaction) -> None:
-        log.info("Command Received: pong")
+    async def pong(interaction: discord.Interaction) -> None:
+        try:
+            log.info("Command Received: /ping pong")
+            await interaction.response.defer()
 
-        if not utility.can_execute(interaction.user, 1, None): # type: ignore
-            await interaction.response.send_message("You do not have permission to use this command")
-            return
-        await interaction.response.send_message("Ping!")
-    tree.add_command(parent, guild=guild)
+            if not utility.can_execute(interaction.user, 1, None): # type: ignore
+                await interaction.followup.send("You do not have permission to use this command")
+                return
+            await interaction.followup.send("Ping!")
+        
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
+    tree.add_command(pingpong, guild=guild)
 
-    @tree.command (
+    data_com = discord.app_commands.Group(name="data", description="...")
+    @data_com.command (
         name="delete_data",
         description="Delete Gang Bot's entire database",
-        guild=guild,
     )
-    async def delete_data(interaction: Interaction) -> None:
-        log.info("Command Received: delete_data")
-        await interaction.response.defer()
+    async def delete_data(interaction: discord.Interaction) -> None:
+        try:
+            log.info("Command Received: /data delete")
+            await interaction.response.defer()
 
-        if not utility.can_execute(interaction.user, 5, None): # type: ignore
-            await interaction.followup.send("You do not have permission to use this command")
-            return
-
-        if sheets.reset_spreadsheet():
-            worksheet = sheets.get_worksheet("bot_data")
-            if not worksheet:
-                await interaction.response.send_message(f"Could not find bot_data sheet")
+            if not utility.can_execute(interaction.user, 5, None): # type: ignore
+                await interaction.followup.send("You do not have permission to use this command")
                 return
-
+            
+            sheets.reset_spreadsheet()
+            worksheet = sheets.get_worksheet("bot_data")
             values = worksheet.get_values()
             dataframe = pd.DataFrame(values[1:], columns=values[0])
             await interaction.followup.send(f"```{dataframe.to_string()}```")
-        else:
-            await interaction.followup.send("Failed to delete database")
 
-    @tree.command (
-        name="refresh_sheet",
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
+
+    @data_com.command (
+        name="refresh",
         description="refresh sheets db and return new sheet",
-        guild=guild,
     )
-    async def refresh_sheet(interaction: Interaction, role: Role, category: CategoryChannel) -> None:
-        """Testing command
+    async def refresh(interaction: discord.Interaction, role: discord.Role) -> None:
+        """Refresh the gang database to pick up any new changes
 
         Parameters
         -----------
@@ -104,53 +119,37 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
         category: discord.ChannelCategory
             testing parameter
         """
-        log.info("Command Received: refresh_sheet")
+        try:
+            log.info("Command Received: /data refresh")
+            await interaction.response.defer()
 
-        if not utility.can_execute(interaction.user, 2, None): # type: ignore
-            await interaction.response.send_message("You do not have permission to use this command")
-            return
+            if not utility.can_execute(interaction.user, 2, None): # type: ignore
+                await interaction.response.send_message("You do not have permission to use this command")
+                return
+            
+            bot_data = sheets.get_worksheet("bot_data")
+            cid = sheets.get_category_id(role)
+            guild = interaction.guild
+            if not guild: raise Exception("Could not get guild")
 
-        worksheet = sheets.get_worksheet("bot_data")
-        if not worksheet:
-            await interaction.response.send_message(f"Could not find bot_data sheet")
-            return
+            dataframe = sheets.get_as_dataframe(
+                sheets.update_worksheet(
+                    bot_data, 
+                    role=role, 
+                    category=await utility.get_category(guild, cid)))
+            await interaction.followup.send(f"```{dataframe.to_string()}```")
+        
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
+    tree.add_command(data_com, guild=guild)
 
-        worksheet = sheets.update_worksheet(worksheet, role=role, category=category)
-        if not worksheet:
-            await interaction.response.send_message("failed")
-            return
-
-        values = worksheet.get_values()
-        dataframe = pd.DataFrame(values[1:], columns=values[0])
-
-        await interaction.response.send_message('```' + dataframe.to_string() + '```')
-
-    @tree.command (
-        name="user",
-        description="how do I send a user to the server?",
-        guild=guild,
-    )
-    async def user(interaction: Interaction, member: Member) -> None:
-        """Does something
-
-        Parameters
-        -----------
-        member: discord.Member
-            the member to interact with
-        """
-        log.info("Command Received: user")
-
-        if not utility.can_execute(interaction.user, 2, None): # type: ignore
-            await interaction.response.send_message("You do not have permission to use this command")
-            return
-        await interaction.response.send_message(utility.get_power(member))
-
-    @tree.command (
+    gang_com = discord.app_commands.Group(name="gang", description="...")
+    @gang_com.command (
         name="create_gang",
         description="Creates role, roster, and channels for a gang",
-        guild=guild,
     )
-    async def create_gang(interaction: Interaction, gang_name: str, color_request: str | None = None) -> None:
+    async def create_gang(interaction: discord.Interaction, gang_name: str, color_request: str | None = None) -> None:
         """Creates all base resources for a gang including:
         - Discord Role
         - Roster
@@ -163,52 +162,39 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
         color: str
             the primary color of the gang in hex format (e.g. #000000, 000000)
         """
-        log.info("Command Received: create_gang")
-        await interaction.response.defer()
+        try:
+            log.info("Command Received: /gang create")
+            await interaction.response.defer()
+        
+            if not utility.can_execute(interaction.user, 5, None): # type: ignore
+                await interaction.followup.send("You do not have permission to use this command")
+                return
 
-        if not utility.can_execute(interaction.user, 5, None): # type: ignore
-            await interaction.followup.send("You do not have permission to use this command")
-            return
+            gang_name = string.capwords(gang_name.strip())
+            guild = interaction.guild
+            if not guild: raise Exception("Could not get guild")
+            
+            all_gangs = [role.name for role in guild.roles]
+            if gang_name in all_gangs:
+                await interaction.followup.send(f"A gang named {gang_name} already exists")
+                return
 
-        guild = interaction.guild
-        if not guild:
-            await interaction.followup.send("Failed to get guild")
-            return
+            newRole = await utility.new_role(guild, gang_name, color_request)
+            newCategory = await utility.new_category(guild, newRole)
+            sheets.create_worksheet(gang_name) # Returns worksheet
+            bot_data = sheets.get_worksheet('bot_data')
+            dataframe = sheets.get_as_dataframe(sheets.update_worksheet(bot_data, role=newRole, category=newCategory))
+            await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {newCategory.mention}")
 
-        gang_name = string.capwords(gang_name.strip())
-        all_gangs = [role.name for role in guild.roles]
-        if gang_name in all_gangs:
-            await interaction.followup.send(f"A gang named {gang_name} already exists")
-            return
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
 
-        newRole = await utility.new_role(guild, gang_name, color_request)
-        if not newRole:
-            await interaction.followup.send("Failed to create new role")
-            return
-        newCategory = await utility.new_category(guild, newRole)
-        if not newCategory:
-            await interaction.followup.send("Failed to create category")
-            return
-        newWorksheet = sheets.create_worksheet(gang_name)
-        if not newWorksheet:
-            await interaction.followup.send("Failed to create worksheet")
-            return
-
-        bot_data = sheets.get_worksheet('bot_data')
-        if not bot_data:
-            await interaction.followup.send("Failed to get bot_data")
-            return
-        worksheet = sheets.update_worksheet(bot_data, role=newRole, category=newCategory)
-
-        dataframe = pd.DataFrame(worksheet.get_values()[1:], columns=worksheet.get_values()[0])
-        await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {newCategory.mention}")
-
-    @tree.command(
+    @gang_com.command(
         name="delete_gang",
         description="Deletes role, roster, and channels for a gang",
-        guild=guild,
     )
-    async def delete_gang(interaction: Interaction, role: Role) -> None:
+    async def delete_gang(interaction: discord.Interaction, role: discord.Role) -> None:
         """Deletes everything associated with a gang, primarily:
         - Discord Role
         - Roster
@@ -219,47 +205,43 @@ def get_commands(tree: app_commands.CommandTree[Client], guild: Object):
         gang_role: Role
             the role of the gang to delete
         """
-        log.info("Command Received: delete_gang")
-        await interaction.response.defer()
+        try:
+            log.info("Command Received: /gang delete")
+            await interaction.response.defer()
+        
+            if not utility.can_execute(interaction.user, 5, None): # type: ignore
+                await interaction.followup.send("You do not have permission to use this command")
+                return
 
-        if not utility.can_execute(interaction.user, 5, None): # type: ignore
-            await interaction.followup.send("You do not have permission to use this command")
-            return
+            sheetnames = [ws.title for ws in sheets.get_worksheets()]
+            if not sheetnames or role.name not in sheetnames:
+                await interaction.followup.send("The provided role must be for a gang")
+                return
 
-        worksheets = sheets.get_worksheets()
-        # This should never be true
-        if not worksheets:
-            return
+            # Delete category
+            cid = sheets.get_category_id(role)
+            guild = interaction.guild
+            guild = interaction.guild
+            if not guild: raise Exception("Could not get guild")
+            await utility.delete_category(guild, cid)
 
-        sheetnames = [ws.title for ws in worksheets]
-        if not sheetnames or role.name not in sheetnames:
-            await interaction.followup.send("The provided role must be for a gang")
-            return
+            sheets.delete_worksheet(role.name, role)
+            await role.delete()
+            await interaction.followup.send("Gang deleted successfully")
 
-        # Delete category
-        cid = sheets.get_category_id(role)
-        if not cid:
-            await interaction.followup.send("Failed to get CID")
-            return
-        guild = interaction.guild
-        if not guild:
-            await interaction.followup.send("Failed to get guild")
-            return
-        if not await utility.delete_category(guild, cid):
-            await interaction.followup.send("Failed to delete category")
+        except Exception as e:
+            await interaction.followup.send("Command failed")
+            raise e
 
-        # Delete worksheet
-        if not sheets.delete_worksheet(role.name, role):
-            await interaction.followup.send("Failed to delete worksheet")
-            return
-
-        # Delete role
-        if not await utility.delete_role(role):
-            await interaction.followup.send("Failed to delete role")
-            return
-
-        await interaction.followup.send("Gang deleted successfully")
-
+        # try:
+        #     log.info("Command Received: ")
+        #     await interaction.response.defer()
+        
+        # except Exception as e:
+        #     await interaction.followup.send("Command failed")
+        #     raise e
+    tree.add_command(gang_com, guild=guild)
+    
 # class LoginSheets(ui.Modal, title="login"):
 #     name = ui.TextInput(
 #         label='Name',
