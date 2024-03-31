@@ -112,15 +112,11 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> None:
             log.info("Attempting to update worksheet 'bot_data' ...")
 
             worksheet = get_worksheet("bot_data")
-            if not worksheet:
-                log.warning("Update worksheet 'bot_data' failed")
-
-            else:
-                values = worksheet.get_values()
-                dataframe = pd.DataFrame(values[1:], columns=values[0])
-                dataframe = dataframe.loc[dataframe['RID'] != str(role.id)]
-                set_with_dataframe(worksheet, dataframe, resize=True)
-                log.info("Updated worksheet 'bot_data'")
+            values = worksheet.get_values()
+            dataframe = pd.DataFrame(values[1:], columns=values[0])
+            dataframe = dataframe.loc[dataframe['RID'] != str(role.id)]
+            set_with_dataframe(worksheet, dataframe, resize=True)
+            log.info("Updated worksheet 'bot_data'")
 
         log.info(f"Attempting to delete worksheet '{worksheetName}'...")
         spreadsheet.del_worksheet(get_worksheet(worksheetName))
@@ -131,51 +127,48 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> None:
         raise e
 
 def update_worksheet(worksheet: Worksheet,
-                    member: Member | None = None,
+                    members: list[Member] | None = None,
                     role: Role | None = None,
                     category: CategoryChannel | None = None) -> Worksheet:
     try:
         log.info(f"Updating worksheet '{worksheet.title}'...")
 
+        if not members and (not role or not category):
+            raise Exception("No parameters sent to update_worksheet")
+
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
 
-        if member:
-            log.info("Updating with member data...")
-            if get_power(member, LOCAL_ROLES) < 1:
-                raise Exception(f"User doesn't have a role")
-
-
+        if members:
             if GANG_DATA_HEADERS != dataframe.columns.tolist():
                 raise Exception(f"'{worksheet.title}' does not have the correct headers for member modification. Was the wrong sheet sent?")
 
-            mid = str(member.id)
-            name = member.nick if member.nick else member.name
-            rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+            for member in members:
+                if get_power(member, LOCAL_ROLES) < 1:
+                    raise Exception(f"User doesn't have a role")
+
+                mid = str(member.id)
+                name = member.nick if member.nick else member.name
+                rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+
+                row_index = dataframe.index[dataframe['ID'] == mid].tolist()
+                if len(row_index) < 1:
+                    log.info(f"Member {name} is new to '{worksheet.title}'")
+                    iban = "None"
+                    row_index = len(dataframe)
+                else:
+                    iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].to_string().split()[1]
+
+                member_data = [mid, name, rank, iban]
+                dataframe.loc[row_index] = member_data
             
-            
-
-            row_index = dataframe.index[dataframe['ID'] == mid].tolist()
-            if len(row_index) < 1:
-                log.info(f"Member {name} is new to '{worksheet.title}'")
-                iban = None
-                row_index = len(dataframe)
-            else:
-                iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"][0]
-            member_data = [mid, name, rank, iban]
-            dataframe.loc[row_index] = member_data
-
-            log.info(f"'{worksheet.title}' updated with member data")
-
-        if not role or not category:
-            raise Exception("Missing role or category in call")
-        else:
+        if role and category:
             if BOT_DATA_HEADERS != dataframe.columns.tolist():
                 raise Exception(f"'{worksheet.title}' does not have the correct headers for role modification. Was the wrong sheet sent?")
 
             name = role.name
             rid = str(role.id)
-            mids = [member.id for member in role.members]
+            mids = [mem.id for mem in role.members]
             modified = date.today()
             cid = str(category.id)
 
@@ -190,9 +183,14 @@ def update_worksheet(worksheet: Worksheet,
             role_data = [name, rid, cid, mids, created, modified]
             dataframe.loc[row_index] = role_data
 
-            log.info(f"'{worksheet.title}' updated with role and category data")
+            if len(role.members) > 0:
+                update_worksheet(get_worksheet(role.name), role.members, role)
 
+        # else:
+        #     raise Exception("update_worksheet requires list[discord.Member] OR discord.Role AND discord.CategoryChannel")
+        
         set_with_dataframe(worksheet, dataframe, resize=True)
+        log.info("Update successful")
         return worksheet
 
     except Exception as e:
@@ -216,6 +214,16 @@ def get_as_dataframe(worksheet: Worksheet) -> pd.DataFrame:
     values = worksheet.get_values()
     dataframe = pd.DataFrame(values[1:], columns=values[0])
     return dataframe
+
+def get_MIDS(role: Role) -> list[str]:
+    try:
+        values = get_worksheet('bot_data').get_values()
+        dataframe = pd.DataFrame(values[1:], columns=values[0])
+        test = dataframe.loc[dataframe["RID"] == role.id, "MIDS"]
+        print(test)
+        return []
+    except Exception as e:
+        raise e
 
 # def gangInDB(role: Role) -> bool:
 #     worksheet = get_worksheet("bot_data")

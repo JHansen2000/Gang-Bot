@@ -7,6 +7,7 @@
 - `python3 main.py`
 
 ## Current Task:
+- Added role handler
 - On Gang Create (and vice versa for delete)
   - Create channel tree and set permissions
 - Add mapping for roles to power for custom gang roles (creation definitely belongs in a modal)

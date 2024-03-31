@@ -132,13 +132,11 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             guild = interaction.guild
             if not guild: raise Exception("Could not get guild")
 
-            # need to update gang worksheet here
+            dataframe = sheets.get_as_dataframe(sheets.update_worksheet(
+                worksheet=bot_data, 
+                role=role, 
+                category=await utility.get_category(guild, cid)))
 
-            dataframe = sheets.get_as_dataframe(
-                sheets.update_worksheet(
-                    bot_data, 
-                    role=role, 
-                    category=await utility.get_category(guild, cid)))
             await interaction.followup.send(f"```{dataframe.to_string()}```")
         
         except Exception as e:
