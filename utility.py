@@ -54,14 +54,14 @@ async def new_category(guild: Guild, role: Role) -> CategoryChannel:
 
   return newCategory
 
-async def get_category(guild: Guild, cid: str) -> CategoryChannel:
+def get_category(guild: Guild, cid: str) -> CategoryChannel:
   category = [cat for cat in guild.categories if str(cat.id == cid)][0]
   if not category:
     raise Exception("Couldn't get category")
   return category
 
 async def delete_category(guild: Guild, cid: str) -> None:
-  category = await get_category(guild, cid)
+  category = get_category(guild, cid)
   channels = category.channels
   for channel in channels:
     try:
@@ -70,4 +70,11 @@ async def delete_category(guild: Guild, cid: str) -> None:
       log.error(f"Failed to delete channel {channel.name}\n\n{e}")
       pass
   await category.delete()
-  
+
+def get_role(guild: Guild, id: str) -> Role:
+  role = guild.get_role(int(id))
+  if not role: raise Exception("Could not get role")
+  return role
+
+def get_roles(guild: Guild) -> list[Role]:
+  return [role for role in guild.roles if role.name in ROLES]

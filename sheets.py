@@ -1,19 +1,18 @@
 import os
-from numpy import str_
 import pandas as pd
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
-from discord import Role, Member, CategoryChannel
+from discord import Guild, Role, Member, CategoryChannel
 from dotenv import load_dotenv
 from datetime import date
-from utility import ROLES, get_power
+from utility import ROLES, get_power, get_role
 import logger
 log = logger.Logger()
 
 load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 # RID = Role ID, CID = Category ID, MIDS= Member IDs (list)
-BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDS", "Created", "Modified"]
+BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDS", "Map", "Created", "Modified"]
 GANG_DATA_HEADERS = ["ID", "Name", "Rank", "IBAN"]
 LOCAL_ROLES = ROLES.copy()
 LOCAL_ROLES.pop("ADMIN")
@@ -83,7 +82,7 @@ def create_worksheet(worksheetName: str) -> Worksheet:
     sheetnames = [ws.title for ws in get_worksheets()]
     if not sheetnames or worksheetName in sheetnames:
         raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
-    
+
     log.info(f"Attempting to create worksheet '{worksheetName}'...")
     newSheet = spreadsheet.add_worksheet(
         title=worksheetName,
@@ -124,6 +123,7 @@ def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -
     rid = str(role.id)
     mids = [mem.id for mem in role.members]
     modified = date.today()
+
     if category:
         cid = str(category.id)
     else:
@@ -134,10 +134,14 @@ def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -
         log.info(f"Role {role.name} is new to '{worksheet.title}'")
         row_index = len(dataframe)
         created = modified
+        role_map = {}
+
     else:
         created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
+        role_map = dataframe.loc[dataframe["RID"] == str(role.id), "Map"][0]
 
-    role_data = [name, rid, cid, mids, created, modified]
+
+    role_data = [name, rid, cid, mids, role_map, created, modified]
     dataframe.loc[row_index] = role_data
 
     set_with_dataframe(worksheet, dataframe, resize=True)
@@ -202,6 +206,14 @@ def get_gangs(member: Member) -> list[Role]:
   matching_gangs = [role for role in member.roles if role.name in gang_roles]
   return matching_gangs
 
+def get_all_gangs(guild: Guild) -> list[Role]:
+    dataframe = get_as_dataframe(get_worksheet('bot_data'))
+    gang_RIDs = dataframe['RID'].to_list()
+    return [get_role(guild, rid) for rid in gang_RIDs]
+
+def set_role_map():
+    return
+
 # def get_MIDS(role: Role) -> list[str]:
 #     try:
 #         values = get_worksheet('bot_data').get_values()
@@ -211,7 +223,6 @@ def get_gangs(member: Member) -> list[Role]:
 #         return []
 #     except Exception as e:
 #         raise e
-
 
 # def gangInDB(role: Role) -> bool:
 #     worksheet = get_worksheet("bot_data")

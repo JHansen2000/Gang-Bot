@@ -1,32 +1,73 @@
-from discord import Client, Member
-from sheets import get_gangs, update_data_worksheet, update_gang_worksheet
+from discord import AuditLogAction, AuditLogEntry, Client, Role
+from sheets import get_gangs, update_data_worksheet, update_gang_worksheet, get_all_gangs
 import logger
-from utility import get_category
+from utility import get_roles
 log = logger.Logger()
 
 
 def get_events(client: Client) -> None:
+    # @client.event
+    # async def on_member_update(before: Member, after: Member) -> None:
+
     @client.event
-    async def on_member_update(before: Member, after: Member) -> None: 
+    async def on_audit_log_entry_create(entry: AuditLogEntry) -> None:
+        if entry.user and not entry.user.bot:
+            if entry.action is AuditLogAction.member_role_update:
+                print(entry.user.name) # Instigator
+                print(entry.target) # Target
 
-        # Member's roles were updated
-        if before.roles != after.roles:  
-            if before.roles < after.roles:
-                removed = [role for role in before.roles if role not in set(after.roles)][0]
-                update_gang_worksheet(removed.name, after, True)
-                update_data_worksheet(removed)
-                log.info(f"Role @{removed.name} removed from '{before.name}'")
-            else:
-                added = [role for role in after.roles if role not in set(before.roles)][0]
-                update_gang_worksheet(added.name, after, False)
-                update_data_worksheet(added)
-                log.info(f"Role @{added} added to '{before.name}'")
-            return
+                guild = entry.guild
+                target_id = entry._target_id
+                if not target_id: raise Exception("Failed to get target_id")
 
-        # Member's name was updated 
-        if before.nick != after.nick:
-            for gang in get_gangs(after):
-                update_gang_worksheet(gang.name, after, False)
-            log.info("Member nickname updated")
+                member = guild.get_member(target_id)
+                if not member: raise Exception(f"Failed to get member with ID {target_id}")
 
-        
+                pre_roles: list[Role] = entry.before.__dict__.get('roles') # type: ignore
+                post_roles: list[Role] = entry.after.__dict__.get('roles') # type: ignore
+                print(pre_roles)
+                print(post_roles)
+
+
+                if len(pre_roles) > len(post_roles):
+                    message = "removed from"
+                    changed_role = pre_roles[0]
+                    delete = True
+                else:
+                    message = "added to"
+                    changed_role = post_roles[0]
+                    delete = False
+
+                isGangRole = True if changed_role in get_all_gangs(guild) else False
+                isRankRole = True if changed_role in get_roles(guild) else False
+                if not isGangRole and not isRankRole:
+                    log.warning(f"Role @{changed_role.name} is not a key role")
+                    return
+
+                elif not isGangRole:
+                    for gang in get_gangs(member):
+                        update_gang_worksheet(gang.name, member, False)
+
+                else:
+                    update_data_worksheet(changed_role)
+                    update_gang_worksheet(changed_role.name, member, delete)
+
+
+                log.info(f"Role @{changed_role.name} {message} '{member.name}'")
+                return
+
+            elif entry.action is AuditLogAction.member_update:
+                guild = entry.guild
+
+                target_id = entry._target_id
+                if not target_id: raise Exception("Failed to get target_id")
+
+                member = guild.get_member(target_id)
+                if not member: raise Exception(f"Failed to get member with ID {target_id}")
+
+                for gang in get_gangs(member):
+                    update_gang_worksheet(gang.name, member, False)
+                log.info("Member nickname updated")
+
+        else:
+            print(entry.action)

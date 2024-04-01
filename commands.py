@@ -15,12 +15,12 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         description="refresh sheets db and return new sheet",
         guild=guild,
     )
-    async def test(interaction: discord.Interaction, role: discord.Role) -> None:
+    async def test(interaction: discord.Interaction, name: str) -> None:
         """Testing command
 
         Parameters
         -----------
-        role: discord.Role
+        name: str
             testing parameter
         """
         try:
@@ -31,13 +31,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
                 await interaction.followup.send("You do not have permission to use this command")
                 return
 
-            guild = interaction.guild
-            if not guild:
-                await interaction.followup.send("failed")
-                return
-
-            res = sheets.get_category_id(role)
-            await interaction.followup.send(res)
+            await interaction.response.send_modal(CreateGang())
 
         except Exception as e:
             await interaction.followup.send("Command failed")
@@ -57,7 +51,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
                 await interaction.followup.send("You do not have permission to use this command")
                 return
             await interaction.followup.send("Pong!")
-        
+
         except Exception as e:
             await interaction.followup.send("Command failed")
             raise e
@@ -75,7 +69,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
                 await interaction.followup.send("You do not have permission to use this command")
                 return
             await interaction.followup.send("Ping!")
-        
+
         except Exception as e:
             await interaction.followup.send("Command failed")
             raise e
@@ -94,7 +88,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             if not utility.can_execute(interaction.user, 5, None): # type: ignore
                 await interaction.followup.send("You do not have permission to use this command")
                 return
-            
+
             sheets.reset_spreadsheet()
             worksheet = sheets.get_worksheet("bot_data")
             values = worksheet.get_values()
@@ -126,21 +120,37 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             if not utility.can_execute(interaction.user, 2, None): # type: ignore
                 await interaction.response.send_message("You do not have permission to use this command")
                 return
-            
+
             bot_data = sheets.get_worksheet("bot_data")
             cid = sheets.get_category_id(role)
             guild = interaction.guild
             if not guild: raise Exception("Could not get guild")
 
             dataframe = sheets.get_as_dataframe(sheets.update_data_worksheet(
-                role=role, 
-                category=await utility.get_category(guild, cid)))
+                role=role,
+                category=utility.get_category(guild, cid)))
 
             await interaction.followup.send(f"```{dataframe.to_string()}```")
-        
+
         except Exception as e:
             await interaction.followup.send("Command failed")
             raise e
+
+    @data_com.command (
+        name="gang",
+        description="get gang sheet"
+    )
+    async def data_gang(interaction: discord.Interaction, role: discord.Role) -> None:
+        dataframe = sheets.get_as_dataframe(sheets.get_worksheet(role.name))
+        await interaction.response.send_message(f"```{dataframe.to_string()}```")
+
+    @data_com.command (
+        name="bot",
+        description="get bot sheet"
+    )
+    async def data_bot(interaction: discord.Interaction) -> None:
+        dataframe = sheets.get_as_dataframe(sheets.get_worksheet('bot_data'))
+        await interaction.response.send_message(f"```{dataframe.to_string()}```")
     tree.add_command(data_com, guild=guild)
 
     gang_com = discord.app_commands.Group(name="gang", description="...")
@@ -164,7 +174,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         try:
             log.info("Command Received: /gang create")
             await interaction.response.defer()
-        
+
             if not utility.can_execute(interaction.user, 5, None): # type: ignore
                 await interaction.followup.send("You do not have permission to use this command")
                 return
@@ -172,7 +182,9 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             gang_name = string.capwords(gang_name.strip())
             guild = interaction.guild
             if not guild: raise Exception("Could not get guild")
-            
+
+
+
             all_gangs = [role.name for role in guild.roles]
             if gang_name in all_gangs:
                 await interaction.followup.send(f"A gang named {gang_name} already exists")
@@ -206,7 +218,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         try:
             log.info("Command Received: /gang delete")
             await interaction.response.defer()
-        
+
             if not utility.can_execute(interaction.user, 5, None): # type: ignore
                 await interaction.followup.send("You do not have permission to use this command")
                 return
@@ -234,21 +246,38 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         # try:
         #     log.info("Command Received: ")
         #     await interaction.response.defer()
-        
+
         # except Exception as e:
         #     await interaction.followup.send("Command failed")
         #     raise e
     tree.add_command(gang_com, guild=guild)
-    
-# class LoginSheets(ui.Modal, title="login"):
-#     name = ui.TextInput(
-#         label='Name',
-#         placeholder='Your name here...',.
-#     )
-#     feedback = ui.TextInput(
-#         label='What do you think of this new feature?',
-#         style=TextStyle.long,
-#         placeholder='Type your feedback here...',
-#         required=False,
-#         max_length=300,
-#     )
+
+class CreateGang(discord.ui.Modal, title="Create Gang"):
+    gl_name = discord.ui.TextInput(
+        label="What do you call your Gang Leader?",
+        placeholder="Gang Leader"
+    )
+    hc_name = discord.ui.TextInput(
+        label="What do you call your High Command?",
+        placeholder="High Command"
+    )
+    m_name = discord.ui.TextInput(
+        label="What do you call a Member?",
+        placeholder="Member"
+    )
+    ha_name = discord.ui.TextInput(
+        label="What do you call a Hangaround?",
+        placeholder="Hangaround"
+    )
+
+    # name = discord.ui.TextInput(
+    #     label='Name',
+    #     placeholder='Your name here...',
+    # )
+    # feedback = discord.ui.TextInput(
+    #     label='What do you think of this new feature?',
+    #     style=discord.TextStyle.long,
+    #     placeholder='Type your feedback here...',
+    #     required=False,
+    #     max_length=300,
+    # )
