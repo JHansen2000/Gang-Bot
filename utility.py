@@ -1,4 +1,4 @@
-from discord import CategoryChannel, Client, Guild, Member, PermissionOverwrite, Role, Colour
+from discord import CategoryChannel, Guild, Member, PermissionOverwrite, Role, Colour
 import logger
 log = logger.Logger()
 
@@ -25,7 +25,6 @@ def can_execute(member: Member, required_power: int, target) -> bool:
   return True if get_power(member) >= required_power else False
 
 async def new_role(guild: Guild, roleName: str, colorRequest: str | None) -> Role:
-  try:
     if not colorRequest:
       color = Colour.default()
     else:
@@ -39,27 +38,21 @@ async def new_role(guild: Guild, roleName: str, colorRequest: str | None) -> Rol
 
     newRole = await guild.create_role(name=roleName, color=color, hoist=True, mentionable=True)
     return newRole
-  
-  except Exception as e:
-    raise e
 
 async def new_category(guild: Guild, role: Role) -> CategoryChannel:
-  try:
-    categories = [category.name for category in guild.categories]
-    categories.append(role.name)
-    categories.sort()
+  categories = [category.name for category in guild.categories]
+  categories.append(role.name)
+  categories.sort()
 
-    newCategory = await guild.create_category(
-      role.name,
-      overwrites= {
-        guild.default_role: PermissionOverwrite(read_messages=False),
-        role: PermissionOverwrite(read_messages=True)
-      },
-      position=categories.index(role.name))
+  newCategory = await guild.create_category(
+    role.name,
+    overwrites= {
+      guild.default_role: PermissionOverwrite(read_messages=False),
+      role: PermissionOverwrite(read_messages=True)
+    },
+    position=categories.index(role.name))
 
-    return newCategory
-  except Exception as e:
-    raise e
+  return newCategory
 
 async def get_category(guild: Guild, cid: str) -> CategoryChannel:
   category = [cat for cat in guild.categories if str(cat.id == cid)][0]
@@ -68,16 +61,13 @@ async def get_category(guild: Guild, cid: str) -> CategoryChannel:
   return category
 
 async def delete_category(guild: Guild, cid: str) -> None:
-  try:
-    category = await get_category(guild, cid)
-    channels = category.channels
-    for channel in channels:
-      try:
-        await channel.delete()
-      except Exception as e:
-        log.error(f"Failed to delete channel {channel.name}\n\n{e}")
-        pass
-    await category.delete()
-    
-  except Exception as e:
-    raise e
+  category = await get_category(guild, cid)
+  channels = category.channels
+  for channel in channels:
+    try:
+      await channel.delete()
+    except Exception as e:
+      log.error(f"Failed to delete channel {channel.name}\n\n{e}")
+      pass
+  await category.delete()
+  

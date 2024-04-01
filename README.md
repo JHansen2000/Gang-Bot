@@ -7,10 +7,12 @@
 - `python3 main.py`
 
 ## Current Task:
-- Added role handler
 - On Gang Create (and vice versa for delete)
   - Create channel tree and set permissions
 - Add mapping for roles to power for custom gang roles (creation definitely belongs in a modal)
+  - Make sure this is SORTED based on role equivalent (HEAPSORT)
+- Fix bug caused by assigning gang role BEFORE rank role
+  - I think fixed by attempting to run with rank role assignment
 
 ## TODO
 - Create following event handlers:
@@ -28,6 +30,7 @@
 - Kick member
 - On init, create and log roles if they don't exist
 - Change rank structure roles
+- Disallow creation of gangs with same name as ranks
 
 ## Done
 - Pong a pinging user

@@ -32,21 +32,18 @@ def db_healthy() -> None:
         raise Exception("Global spreadsheet not found")
 
     sheetnames = [ws.title for ws in spreadsheet.worksheets()]
-    try:
-        if "bot_data" not in sheetnames:
-            log.warning("bot_data sheet not found - creating...")
-            bot_data = spreadsheet.add_worksheet(
-                title="bot_data",
-                rows=1,
-                cols=len(BOT_DATA_HEADERS),
-                index=len(sheetnames))
-            dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
-            set_with_dataframe(bot_data, dataframe, resize=True)
-            log.info("bot_data sheet created")
-        return
 
-    except Exception as e:
-        raise e
+    if "bot_data" not in sheetnames:
+        log.warning("bot_data sheet not found - creating...")
+        bot_data = spreadsheet.add_worksheet(
+            title="bot_data",
+            rows=1,
+            cols=len(BOT_DATA_HEADERS),
+            index=len(sheetnames))
+        dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
+        set_with_dataframe(bot_data, dataframe, resize=True)
+        log.info("bot_data sheet created")
+    return
 
 def get_worksheets() -> list[Worksheet]:
     try:
@@ -59,7 +56,6 @@ def get_worksheets() -> list[Worksheet]:
 
 def reset_spreadsheet() -> None:
     worksheets = get_worksheets()
-
     reqs = [
         {"repeatCell": {
             "range": {"sheetId": s.id},
@@ -68,18 +64,14 @@ def reset_spreadsheet() -> None:
         {"deleteSheet": {"sheetId": s.id}}
         for i, s in enumerate(worksheets)]
 
-    try:
-        log.info("Deleting gang spreadsheets...")
-        spreadsheet.batch_update({"requests": reqs})
-        log.info("Resetting bot_data headers...")
-        bot_data = get_worksheet("bot_data")
-        dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
-        set_with_dataframe(bot_data, dataframe, resize=True)
-        log.info("Spreadsheet reset complete")
-        return
-
-    except Exception as e:
-        raise e
+    log.info("Deleting gang spreadsheets...")
+    spreadsheet.batch_update({"requests": reqs})
+    log.info("Resetting bot_data headers...")
+    bot_data = get_worksheet("bot_data")
+    dataframe = pd.DataFrame(columns=BOT_DATA_HEADERS)
+    set_with_dataframe(bot_data, dataframe, resize=True)
+    log.info("Spreadsheet reset complete")
+    return
 
 def get_worksheet(worksheetName: str) -> Worksheet:
     sheetnames = [ws.title for ws in spreadsheet.worksheets()]
@@ -91,216 +83,135 @@ def create_worksheet(worksheetName: str) -> Worksheet:
     sheetnames = [ws.title for ws in get_worksheets()]
     if not sheetnames or worksheetName in sheetnames:
         raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
-    try:
-        log.info(f"Attempting to create worksheet '{worksheetName}'...")
-        newSheet = spreadsheet.add_worksheet(
-            title=worksheetName,
-            rows=2,
-            cols=len(GANG_DATA_HEADERS),
-            index=len(sheetnames) - 1)
-        log.info(f"Created worksheet '{worksheetName}'")
+    
+    log.info(f"Attempting to create worksheet '{worksheetName}'...")
+    newSheet = spreadsheet.add_worksheet(
+        title=worksheetName,
+        rows=2,
+        cols=len(GANG_DATA_HEADERS),
+        index=len(sheetnames) - 1)
+    log.info(f"Created worksheet '{worksheetName}'")
 
-        dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
-        set_with_dataframe(newSheet, dataframe, resize=True)
-        return newSheet
-
-    except Exception as e:
-        raise e
+    dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
+    set_with_dataframe(newSheet, dataframe, resize=True)
+    return newSheet
 
 def delete_worksheet(worksheetName: str, role: Role | None = None) -> None:
-    try:
-        if role:
-            log.info("Attempting to update worksheet 'bot_data' ...")
+    if role:
+        log.info("Attempting to update worksheet 'bot_data' ...")
 
-            worksheet = get_worksheet("bot_data")
-            values = worksheet.get_values()
-            dataframe = pd.DataFrame(values[1:], columns=values[0])
-            dataframe = dataframe.loc[dataframe['RID'] != str(role.id)]
-            set_with_dataframe(worksheet, dataframe, resize=True)
-            log.info("Updated worksheet 'bot_data'")
-
-        log.info(f"Attempting to delete worksheet '{worksheetName}'...")
-        spreadsheet.del_worksheet(get_worksheet(worksheetName))
-        log.info(f"Deleted worksheet '{worksheetName}'")
-        return
-
-    except Exception as e:
-        raise e
-
-def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -> Worksheet:
-    try:
-        log.info(f"Updating worksheet 'bot_data'...")
-        worksheet = get_worksheet('bot_data')
-        dataframe = get_as_dataframe(worksheet)
-
-        if BOT_DATA_HEADERS != dataframe.columns.tolist():
-                raise Exception(f"'bot_data' does not have the correct headers")
-
-        name = role.name
-        rid = str(role.id)
-        mids = [mem.id for mem in role.members]
-        modified = date.today()
-        if category:
-            cid = str(category.id)
-        else:
-            cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
-
-        row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
-        if len(row_index) < 1:
-            log.info(f"Role {role.name} is new to '{worksheet.title}'")
-            row_index = len(dataframe)
-            created = modified
-        else:
-            created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
-
-        role_data = [name, rid, cid, mids, created, modified]
-        dataframe.loc[row_index] = role_data
-
-        set_with_dataframe(worksheet, dataframe, resize=True)
-        log.info("Update successful")
-        return worksheet
-    
-    except Exception as e:
-        raise e
-
-def update_gang_worksheet(sheetname: str, member: Member, delete: bool) -> Worksheet:
-    try:
-        log.info(f"Updating worksheet '{sheetname}'...")
-        worksheet = get_worksheet(sheetname)
-        dataframe = get_as_dataframe(worksheet)
-
-        if GANG_DATA_HEADERS != dataframe.columns.tolist():
-            raise Exception(f"'{sheetname}' does not have the correct headers")
-
-        if delete:
-            dataframe = dataframe.loc[dataframe['ID'] != str(member.id)]
-            set_with_dataframe(worksheet, dataframe, resize=True)
-            log.info("Update successful")
-            return worksheet
-
-        if get_power(member, LOCAL_ROLES) < 1:
-            raise Exception(f"User doesn't have a role")
-
-        mid = str(member.id)
-        name = member.nick if member.nick else member.name
-        rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
-
-        row_index = dataframe.index[dataframe['ID'] == mid].tolist()
-        if len(row_index) < 1:
-            log.info(f"Member {name} is new to '{sheetname}'")
-            row_index = len(dataframe)
-            iban = "None"
-        else:
-            iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].to_string().split()[1]
-
-        member_data = [mid, name, rank, iban]
-        dataframe.loc[row_index] = member_data
-
-        set_with_dataframe(worksheet, dataframe, resize=True)
-        log.info("Update successful")
-        return worksheet
-
-    except Exception as e:
-        raise e
-
-def update_worksheet(worksheet: Worksheet,
-                    members: list[Member] | None = None,
-                    role: Role | None = None,
-                    category: CategoryChannel | None = None) -> Worksheet:
-    try:
-        log.info(f"Updating worksheet '{worksheet.title}'...")
-
-        if not members and (not role or not category):
-            raise Exception("No parameters sent to update_worksheet")
-
+        worksheet = get_worksheet("bot_data")
         values = worksheet.get_values()
         dataframe = pd.DataFrame(values[1:], columns=values[0])
+        dataframe = dataframe.loc[dataframe['RID'] != str(role.id)]
+        set_with_dataframe(worksheet, dataframe, resize=True)
+        log.info("Updated worksheet 'bot_data'")
 
-        if members:
-            if GANG_DATA_HEADERS != dataframe.columns.tolist():
-                raise Exception(f"'{worksheet.title}' does not have the correct headers for member modification. Was the wrong sheet sent?")
+    log.info(f"Attempting to delete worksheet '{worksheetName}'...")
+    spreadsheet.del_worksheet(get_worksheet(worksheetName))
+    log.info(f"Deleted worksheet '{worksheetName}'")
+    return
 
-            for member in members:
-                if get_power(member, LOCAL_ROLES) < 1:
-                    raise Exception(f"User doesn't have a role")
+def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -> Worksheet:
+    log.info(f"Updating worksheet 'bot_data'...")
+    worksheet = get_worksheet('bot_data')
+    dataframe = get_as_dataframe(worksheet)
 
-                mid = str(member.id)
-                name = member.nick if member.nick else member.name
-                rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+    if BOT_DATA_HEADERS != dataframe.columns.tolist():
+            raise Exception(f"'bot_data' does not have the correct headers")
 
-                row_index = dataframe.index[dataframe['ID'] == mid].tolist()
-                if len(row_index) < 1:
-                    log.info(f"Member {name} is new to '{worksheet.title}'")
-                    iban = "None"
-                    row_index = len(dataframe)
-                else:
-                    iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].to_string().split()[1]
+    name = role.name
+    rid = str(role.id)
+    mids = [mem.id for mem in role.members]
+    modified = date.today()
+    if category:
+        cid = str(category.id)
+    else:
+        cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
 
-                member_data = [mid, name, rank, iban]
-                dataframe.loc[row_index] = member_data
-            
-        if role and category:
-            if BOT_DATA_HEADERS != dataframe.columns.tolist():
-                raise Exception(f"'{worksheet.title}' does not have the correct headers for role modification. Was the wrong sheet sent?")
+    row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
+    if len(row_index) < 1:
+        log.info(f"Role {role.name} is new to '{worksheet.title}'")
+        row_index = len(dataframe)
+        created = modified
+    else:
+        created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
 
-            name = role.name
-            rid = str(role.id)
-            mids = [mem.id for mem in role.members]
-            modified = date.today()
-            cid = str(category.id)
+    role_data = [name, rid, cid, mids, created, modified]
+    dataframe.loc[row_index] = role_data
 
-            row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
-            if len(row_index) < 1:
-                log.info(f"Role {role.name} is new to '{worksheet.title}'")
-                row_index = len(dataframe)
-                created = modified
-            else:
-                created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
+    set_with_dataframe(worksheet, dataframe, resize=True)
+    log.info("Update successful")
+    return worksheet
 
-            role_data = [name, rid, cid, mids, created, modified]
-            dataframe.loc[row_index] = role_data
+def update_gang_worksheet(sheetname: str, member: Member, delete: bool) -> Worksheet:
+    log.info(f"Updating worksheet '{sheetname}'...")
+    worksheet = get_worksheet(sheetname)
+    dataframe = get_as_dataframe(worksheet)
 
-            if len(role.members) > 0:
-                update_worksheet(get_worksheet(role.name), role.members, role)
+    if GANG_DATA_HEADERS != dataframe.columns.tolist():
+        raise Exception(f"'{sheetname}' does not have the correct headers")
 
-        # else:
-        #     raise Exception("update_worksheet requires list[discord.Member] OR discord.Role AND discord.CategoryChannel")
-        
+    if delete:
+        dataframe = dataframe.loc[dataframe['ID'] != str(member.id)]
         set_with_dataframe(worksheet, dataframe, resize=True)
         log.info("Update successful")
         return worksheet
 
-    except Exception as e:
-        raise e
+    if get_power(member, LOCAL_ROLES) < 1:
+        raise Exception(f"User doesn't have a role")
+
+    mid = str(member.id)
+    name = member.nick if member.nick else member.name
+    rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+
+    row_index = dataframe.index[dataframe['ID'] == mid].tolist()
+    if len(row_index) < 1:
+        log.info(f"Member {name} is new to '{sheetname}'")
+        row_index = len(dataframe)
+        iban = "None"
+    else:
+        iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].to_string().split()[1]
+
+    member_data = [mid, name, rank, iban]
+    dataframe.loc[row_index] = member_data
+
+    set_with_dataframe(worksheet, dataframe, resize=True)
+    log.info("Update successful")
+    return worksheet
 
 def get_category_id(role: Role) -> str:
     log.info(f"Getting CID for '{role.name}'...")
     worksheet = get_worksheet('bot_data')
-    try:
-        values = worksheet.get_values()
-        dataframe = pd.DataFrame(values[1:], columns=values[0])
-        cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
 
-        log.info(f"Found CID: {cid}")
-        return cid
-    
-    except Exception as e:
-        raise e
+    values = worksheet.get_values()
+    dataframe = pd.DataFrame(values[1:], columns=values[0])
+    cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
+
+    log.info(f"Found CID: {cid}")
+    return cid
 
 def get_as_dataframe(worksheet: Worksheet) -> pd.DataFrame:
     values = worksheet.get_values()
     dataframe = pd.DataFrame(values[1:], columns=values[0])
     return dataframe
 
-def get_MIDS(role: Role) -> list[str]:
-    try:
-        values = get_worksheet('bot_data').get_values()
-        dataframe = pd.DataFrame(values[1:], columns=values[0])
-        test = dataframe.loc[dataframe["RID"] == role.id, "MIDS"]
-        print(test)
-        return []
-    except Exception as e:
-        raise e
+def get_gangs(member: Member) -> list[Role]:
+  dataframe = get_as_dataframe(get_worksheet('bot_data'))
+  gang_roles = dataframe['Name'].to_list()
+  matching_gangs = [role for role in member.roles if role.name in gang_roles]
+  return matching_gangs
+
+# def get_MIDS(role: Role) -> list[str]:
+#     try:
+#         values = get_worksheet('bot_data').get_values()
+#         dataframe = pd.DataFrame(values[1:], columns=values[0])
+#         test = dataframe.loc[dataframe["RID"] == role.id, "MIDS"]
+#         print(test)
+#         return []
+#     except Exception as e:
+#         raise e
+
 
 # def gangInDB(role: Role) -> bool:
 #     worksheet = get_worksheet("bot_data")

@@ -132,8 +132,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             guild = interaction.guild
             if not guild: raise Exception("Could not get guild")
 
-            dataframe = sheets.get_as_dataframe(sheets.update_worksheet(
-                worksheet=bot_data, 
+            dataframe = sheets.get_as_dataframe(sheets.update_data_worksheet(
                 role=role, 
                 category=await utility.get_category(guild, cid)))
 

@@ -1,5 +1,5 @@
 from discord import Client, Member
-from sheets import update_data_worksheet, update_gang_worksheet
+from sheets import get_gangs, update_data_worksheet, update_gang_worksheet
 import logger
 from utility import get_category
 log = logger.Logger()
@@ -25,7 +25,8 @@ def get_events(client: Client) -> None:
 
         # Member's name was updated 
         if before.nick != after.nick:
+            for gang in get_gangs(after):
+                update_gang_worksheet(gang.name, after, False)
             log.info("Member nickname updated")
-            # update_gang_worksheet()
-            # Iterate through update_worksheet with ONLY gang roles
+
         
