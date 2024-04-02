@@ -11,8 +11,6 @@
   - Create channel tree and set permissions
 - Add mapping for roles to power for custom gang roles (creation definitely belongs in a modal)
   - Make sure this is SORTED based on role equivalent (HEAPSORT)
-- Fix bug caused by assigning gang role BEFORE rank role
-  - I think fixed by attempting to run with rank role assignment
 
 ## TODO
 - Create following event handlers:
@@ -45,4 +43,4 @@
 ## Ideas
 - Custom tags for positions
   - Can I hide roles? No
-- 
+-
