@@ -1,4 +1,5 @@
 import os
+from typing import Any
 import pandas as pd
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
@@ -111,7 +112,10 @@ def delete_worksheet(worksheetName: str, role: Role | None = None) -> None:
     log.info(f"Deleted worksheet '{worksheetName}'")
     return
 
-def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -> Worksheet:
+def update_data_worksheet(role: Role,
+                          gang_map: dict[str, str] | None = None,
+                          category: CategoryChannel | None = None
+                          ) -> Worksheet:
     log.info(f"Updating worksheet 'bot_data'...")
     worksheet = get_worksheet('bot_data')
     dataframe = get_as_dataframe(worksheet)
@@ -127,21 +131,24 @@ def update_data_worksheet(role: Role, category: CategoryChannel | None = None) -
     if category:
         cid = str(category.id)
     else:
-        cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
+        cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"].to_string().split()[1]
+
+    if gang_map:
+        gmap = gang_map
+    else:
+        gmap = dataframe.loc[dataframe["RID"] == str(role.id), "Map"].to_string().split()[1]
 
     row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
     if len(row_index) < 1:
         log.info(f"Role {role.name} is new to '{worksheet.title}'")
         row_index = len(dataframe)
         created = modified
-        role_map = {}
 
     else:
-        created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"][0]
-        role_map = dataframe.loc[dataframe["RID"] == str(role.id), "Map"][0]
+        created = dataframe.loc[dataframe["RID"] == str(role.id), "Created"].to_string().split()[1]
 
 
-    role_data = [name, rid, cid, mids, role_map, created, modified]
+    role_data = [name, rid, cid, mids, gmap, created, modified]
     dataframe.loc[row_index] = role_data
 
     set_with_dataframe(worksheet, dataframe, resize=True)
@@ -190,7 +197,7 @@ def get_category_id(role: Role) -> str:
 
     values = worksheet.get_values()
     dataframe = pd.DataFrame(values[1:], columns=values[0])
-    cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"][0]
+    cid = dataframe.loc[dataframe["RID"] == str(role.id), "CID"].to_string().split()[1]
 
     log.info(f"Found CID: {cid}")
     return cid
@@ -211,28 +218,15 @@ def get_all_gangs(guild: Guild) -> list[Role]:
     gang_RIDs = dataframe['RID'].to_list()
     return [get_role(guild, rid) for rid in gang_RIDs]
 
-def set_role_map():
-    return
-
-# def get_MIDS(role: Role) -> list[str]:
-#     try:
-#         values = get_worksheet('bot_data').get_values()
-#         dataframe = pd.DataFrame(values[1:], columns=values[0])
-#         test = dataframe.loc[dataframe["RID"] == role.id, "MIDS"]
-#         print(test)
-#         return []
-#     except Exception as e:
-#         raise e
-
-# def gangInDB(role: Role) -> bool:
-#     worksheet = get_worksheet("bot_data")
-#     if not worksheet:
-#         log.error("Failed to get bot_data worksheet")
+# def row_exists(dataframe: pd.DataFrame, id: int) -> bool:
+#     if dataframe.empty:
 #         return False
 
-#     values = worksheet.get_values()
-#     dataframe = pd.DataFrame(values[1:], columns=values[0])
-#     print(dataframe)
+#     res = dataframe.loc[dataframe['RID'] == str(id)]
+#     if res.empty:
+#         return False
+
 #     return True
 
-# https://github.com/robin900/gspread-dataframe
+def change_role_map():
+    return
