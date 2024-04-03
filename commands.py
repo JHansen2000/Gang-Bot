@@ -52,7 +52,6 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         """
         try:
             log.info("Command Received: /create gang")
-            await interaction.response.defer(ephemeral=True)
 
             if not utility.can_execute(interaction.user, 5, None): # type: ignore
                 await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
