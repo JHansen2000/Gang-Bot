@@ -1,4 +1,5 @@
 from cProfile import label
+from code import interact
 import discord
 from discord import ButtonStyle
 from discord import IntegrationAccount
@@ -18,25 +19,40 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         description="refresh sheets db and return new sheet",
         guild=guild,
     )
-    async def test(interaction: discord.Interaction) -> None:
+    async def test(interaction: discord.Interaction, role: discord.Role) -> None:
         """Testing command
 
         Parameters
         -----------
-        name: str
+        role: discord.Role
             testing parameter
         """
         try:
             log.info("Command Received: /test")
 
-            if not utility.can_execute(interaction.user, 2, None): # type: ignore
-                await interaction.followup.send("You do not have permission to use this command")
-                return
+            # guild = interaction.guild
+            # if not guild:
+            #     raise Exception("Failed to get guild")
 
-            await interaction.response.send_modal(CreateGangForm())
+            # if not utility.can_execute(interaction.user, 2, None): # type: ignore
+            #     await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
+            #     return
+
+            # newMap = {
+            # "Gang Leader": "gl",
+            # "High Command": "hc",
+            # "Member": "m",
+            # "Hangaround": "h"
+            # }
+
+            # newMap = await utility.create_subroles(guild, role, newMap)
+            # print(newMap)
+
+            sheets.get_custom_roles(str(role.id))
+            await interaction.response.send_message("test done", ephemeral=True)
 
         except Exception as e:
-            await interaction.response.send_message("Command failed")
+            await interaction.response.send_message("Command failed", ephemeral=True)
             raise e
 
     create_com = discord.app_commands.Group(name="create", description="Creation commands")
@@ -261,6 +277,8 @@ class CreateGangForm(discord.ui.Modal, title="Create Gang"):
     )
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
         if not guild: raise Exception("Could not get guild")
 
@@ -271,14 +289,15 @@ class CreateGangForm(discord.ui.Modal, title="Create Gang"):
             return
 
         sheets.create_worksheet(gang_name)
-        newRole = await utility.new_role(guild, gang_name, None)
-        newCategory = await utility.new_category(guild, newRole)
+        newRole = await utility.new_role(guild, gang_name)
         newMap = {
             "Gang Leader": string.capwords(str(self.gl_name).strip()),
             "High Command": string.capwords(str(self.hc_name).strip()),
             "Member": string.capwords(str(self.m_name).strip()),
             "Hangaround": string.capwords(str(self.ha_name).strip())
             }
+        newMap = await utility.create_subroles(guild, newRole, newMap)
+        newCategory = await utility.new_category(guild, newRole)
 
         dataframe = sheets.get_as_dataframe(sheets.update_data_worksheet(newRole, newMap, newCategory))
-        await interaction.response.send_message(f"```{dataframe}```\n{newRole.mention} - {newCategory.mention}", ephemeral=True)
+        await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {newCategory.mention}", ephemeral=True)

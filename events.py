@@ -1,5 +1,5 @@
 from discord import AuditLogAction, AuditLogEntry, Client, Role
-from sheets import get_gangs, update_data_worksheet, update_gang_worksheet, get_all_gangs
+from sheets import update_data_worksheet, update_gang_worksheet, get_all_gangs
 import logger
 from utility import get_roles
 log = logger.Logger()
@@ -11,10 +11,11 @@ def get_events(client: Client) -> None:
 
     @client.event
     async def on_audit_log_entry_create(entry: AuditLogEntry) -> None:
+        return # TEMPORARY SKIP
         if entry.user and not entry.user.bot:
             if entry.action is AuditLogAction.member_role_update:
-                print(entry.user.name) # Instigator
-                print(entry.target) # Target
+                # entry.user.name # Instigator
+                # entry.target # Target
 
                 guild = entry.guild
                 target_id = entry._target_id
@@ -70,4 +71,4 @@ def get_events(client: Client) -> None:
                 log.info("Member nickname updated")
 
         else:
-            print(entry.action)
+            log.warning(str(entry.action))

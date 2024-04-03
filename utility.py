@@ -3,20 +3,20 @@ import logger
 log = logger.Logger()
 
 ROLES = {
-  "ADMIN": 5,
-  "Gang Leader" : 4,
-  "High Command": 3,
-  "Member": 2,
-  "Hangaround": 1
+  "ADMIN": "5",
+  "Gang Leader" : "4",
+  "High Command": "3",
+  "Member": "2",
+  "Hangaround": "1"
 }
 
-def get_power(member: Member, roles: dict[str, int] = ROLES) -> int:
+def get_power(member: Member, roles: dict[str, str] = ROLES) -> int:
   power = 0
   for role in member.roles:
     if role.name in roles:
-      role_power = roles.get(role.name)
+      role_power = str(roles.get(role.name))
       if role_power:
-        power = max(role_power, power)
+        power = max(int(role_power), power)
   return power
 
 def can_execute(member: Member, required_power: int, target) -> bool:
@@ -24,19 +24,8 @@ def can_execute(member: Member, required_power: int, target) -> bool:
     return True if get_power(member) >= required_power else False
   return True if get_power(member) >= required_power else False
 
-async def new_role(guild: Guild, roleName: str, colorRequest: str | None) -> Role:
-    if not colorRequest:
-      color = Colour.default()
-    else:
-      match len(colorRequest):
-        case 6:
-          color = int(colorRequest.strip())
-        case 7:
-          color = int(colorRequest.strip()[1:])
-        case _:
-          color = Colour.default()
-
-    newRole = await guild.create_role(name=roleName, color=color, hoist=True, mentionable=True)
+async def new_role(guild: Guild, roleName: str, hoisted: bool = True) -> Role:
+    newRole = await guild.create_role(name=roleName, hoist=hoisted, mentionable=True)
     return newRole
 
 async def new_category(guild: Guild, role: Role) -> CategoryChannel:
@@ -78,3 +67,17 @@ def get_role(guild: Guild, id: str) -> Role:
 
 def get_roles(guild: Guild) -> list[Role]:
   return [role for role in guild.roles if role.name in ROLES]
+
+async def create_subroles(guild: Guild, role: Role, rmap: dict[str, str]) -> dict[str, str]:
+  newMap: dict[str, str] = {}
+
+  for key, value in rmap.items():
+    newName = f"{role.name} - {value}"
+    power = ROLES.get(key)
+
+    if not power:
+      raise Exception(f"Could not find {key} in ROLES")
+
+    newRole = await new_role(guild, newName, hoisted=False)
+    newMap[str(newRole.id)] = power
+  return newMap

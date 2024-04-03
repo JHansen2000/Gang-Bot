@@ -1,5 +1,4 @@
 import os
-from typing import Any
 import pandas as pd
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
@@ -7,13 +6,14 @@ from discord import Guild, Role, Member, CategoryChannel
 from dotenv import load_dotenv
 from datetime import date
 from utility import ROLES, get_power, get_role
+import json
 import logger
 log = logger.Logger()
 
 load_dotenv()
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-# RID = Role ID, CID = Category ID, MIDS= Member IDs (list)
-BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDS", "Map", "Created", "Modified"]
+# RID=Role ID, CID=Category ID, MIDs=Member IDs (list), CRIDs=Custom Role IDs (list)
+BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDs", "CRIDs", "Created", "Modified"]
 GANG_DATA_HEADERS = ["ID", "Name", "Rank", "IBAN"]
 LOCAL_ROLES = ROLES.copy()
 LOCAL_ROLES.pop("ADMIN")
@@ -136,7 +136,7 @@ def update_data_worksheet(role: Role,
     if gang_map:
         gmap = gang_map
     else:
-        gmap = dataframe.loc[dataframe["RID"] == str(role.id), "Map"].to_string().split()[1]
+        gmap = dataframe.loc[dataframe["RID"] == str(role.id), "CRIDs"].to_string().split()[1]
 
     row_index = dataframe.index[dataframe['RID'] == str(role.id)].tolist()
     if len(row_index) < 1:
@@ -174,7 +174,7 @@ def update_gang_worksheet(sheetname: str, member: Member, delete: bool) -> Works
 
     mid = str(member.id)
     name = member.nick if member.nick else member.name
-    rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(get_power(member, LOCAL_ROLES))]
+    rank = list(LOCAL_ROLES.keys())[list(LOCAL_ROLES.values()).index(str(get_power(member, LOCAL_ROLES)))]
 
     row_index = dataframe.index[dataframe['ID'] == mid].tolist()
     if len(row_index) < 1:
@@ -207,16 +207,26 @@ def get_as_dataframe(worksheet: Worksheet) -> pd.DataFrame:
     dataframe = pd.DataFrame(values[1:], columns=values[0])
     return dataframe
 
-def get_gangs(member: Member) -> list[Role]:
-  dataframe = get_as_dataframe(get_worksheet('bot_data'))
-  gang_roles = dataframe['Name'].to_list()
-  matching_gangs = [role for role in member.roles if role.name in gang_roles]
-  return matching_gangs
+# def get_gangs(member: Member) -> list[Role]:
+#   dataframe = get_as_dataframe(get_worksheet('bot_data'))
+#   gang_roles = dataframe['Name'].to_list()
+#   matching_gangs = [role for role in member.roles if role.name in gang_roles]
+#   return matching_gangs
 
 def get_all_gangs(guild: Guild) -> list[Role]:
     dataframe = get_as_dataframe(get_worksheet('bot_data'))
     gang_RIDs = dataframe['RID'].to_list()
     return [get_role(guild, rid) for rid in gang_RIDs]
+
+def get_gang_RIDs() -> list[str]:
+    dataframe = get_as_dataframe(get_worksheet('bot_data'))
+    return dataframe['RID'].to_list()
+
+def get_custom_roles(rid: str) -> list[Role]:
+    dataframe = get_as_dataframe(get_worksheet('bot_data'))
+    CRIDs_string = dataframe.loc[dataframe["RID"] == rid, "CRIDs"]
+    print(CRIDs_string)
+    return []
 
 # def row_exists(dataframe: pd.DataFrame, id: int) -> bool:
 #     if dataframe.empty:
