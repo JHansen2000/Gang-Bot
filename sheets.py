@@ -84,6 +84,7 @@ class Database:
     return subrole_ids
 
   def update_bot(self, ):
+    # Next task
     return
 
   def update_gang(self):
@@ -100,9 +101,12 @@ class Database:
         cols=len(GANG_DATA_HEADERS),
         index=len(self.sheetnames))
     log.info(f"Created worksheet '{worksheetName}'")
-
     dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
     set_with_dataframe(newSheet, dataframe, resize=True)
+
+    self.worksheets.append(newSheet)
+    self.sheetnames.append(newSheet.title)
+    self.sheetids.append(newSheet.id)
     return newSheet
 
   async def create_role(self,
@@ -115,18 +119,12 @@ class Database:
   async def create_category(self,
                             guild: discord.Guild,
                             role: discord.Role) -> discord.CategoryChannel:
-    categories = [category.name for category in guild.categories]
-    categories.append(role.name)
-    categories.sort()
-
     newCategory = await guild.create_category(
       role.name,
       overwrites= {
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
         role: discord.PermissionOverwrite(read_messages=True)
-      },
-      position=categories.index(role.name))
-
+      })
     return newCategory
 
   async def create_subroles(self,
@@ -150,6 +148,8 @@ class Database:
     for i, worksheet in enumerate(self.worksheets):
       if worksheet.title == sheetname:
         self.worksheets.pop(i)
+        self.sheetnames.pop(i)
+        self.sheetids.pop(i)
         self.spreadsheet.del_worksheet(worksheet)
     raise Exception(f"Couldn't find worksheet called {sheetname}")
 
