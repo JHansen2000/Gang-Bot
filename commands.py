@@ -1,8 +1,4 @@
-from cProfile import label
-from code import interact
 import discord
-from discord import ButtonStyle
-from discord import IntegrationAccount
 import discord.utils
 import sheets
 import utility
@@ -34,9 +30,9 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             # if not guild:
             #     raise Exception("Failed to get guild")
 
-            # if not utility.can_execute(interaction.user, 2, None): # type: ignore
-            #     await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
-            #     return
+            if not sheets.can_execute(interaction.user, 4, role): # type: ignore
+                await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
+                return
 
             # newMap = {
             # "Gang Leader": "gl",
@@ -48,7 +44,8 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             # newMap = await utility.create_subroles(guild, role, newMap)
             # print(newMap)
 
-            sheets.get_custom_roles(str(role.id))
+            
+
             await interaction.response.send_message("test done", ephemeral=True)
 
         except Exception as e:
@@ -69,8 +66,8 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         try:
             log.info("Command Received: /create gang")
 
-            if not utility.can_execute(interaction.user, 5, None): # type: ignore
-                await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
+            if not sheets.can_execute(interaction.user, 5, None): # type: ignore
+                await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
                 return
 
             await interaction.response.send_modal(CreateGangForm())
@@ -89,7 +86,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
         try:
             log.info("Command Received: /data delete")
 
-            if not utility.can_execute(interaction.user, 5, None): # type: ignore
+            if not sheets.can_execute(interaction.user, 5): # type: ignore
                 await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
                 return
 
@@ -145,8 +142,8 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             log.info("Command Received: /gang delete")
             await interaction.response.defer(ephemeral=True)
 
-            if not utility.can_execute(interaction.user, 5, None): # type: ignore
-                await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
+            if not sheets.can_execute(interaction.user, 5, role): # type: ignore
+                await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
                 return
 
             sheetnames = [ws.title for ws in sheets.get_worksheets()]
@@ -193,7 +190,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client], guild: 
             log.info("Command Received: /data refresh")
             await interaction.response.defer(ephemeral=True)
 
-            if not utility.can_execute(interaction.user, 2, None): # type: ignore
+            if not sheets.can_execute(interaction.user, 2, None): # type: ignore
                 await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
                 return
 

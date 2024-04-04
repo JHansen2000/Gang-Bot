@@ -1,7 +1,7 @@
 from discord import AuditLogAction, AuditLogEntry, Client, Role
 from sheets import update_data_worksheet, update_gang_worksheet, get_all_gangs
 import logger
-from utility import get_roles
+# from utility import get_roles
 log = logger.Logger()
 
 
@@ -11,7 +11,6 @@ def get_events(client: Client) -> None:
 
     @client.event
     async def on_audit_log_entry_create(entry: AuditLogEntry) -> None:
-        return # TEMPORARY SKIP
         if entry.user and not entry.user.bot:
             if entry.action is AuditLogAction.member_role_update:
                 # entry.user.name # Instigator
