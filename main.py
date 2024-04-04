@@ -2,42 +2,47 @@ import os
 from dotenv import load_dotenv
 from discord import Intents, Client, Object, app_commands
 from commands import get_commands
-from sheets import db_healthy
+from sheets import Database, connect_to_db
 from events import get_events
+from logger import Logger
+log = Logger()
 
-# Import custom logger
-import logger
-log = logger.Logger()
-
-# Load TOKEN from .env
+log.info("Loading environment...")
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
-if not TOKEN:
-    log.fatal("Unable to get DISCORD_TOKEN")
-    exit()
-log.info(f"Loaded DISCORD_TOKEN - {TOKEN}")
+DISCORD_TOKEN=os.getenv('DISCORD_TOKEN')
+GUILD_ID=os.getenv('GUILD_ID')
+SPREADSHEET_ID=os.getenv("SPREADSHEET_ID")
+ADMIN_ID=os.getenv("ADMIN_ID")
+if not DISCORD_TOKEN:
+  log.error("Failed to get DISCORD_TOKEN")
+  exit()
+if not GUILD_ID:
+  log.error("Failed to get GUILD_ID")
+  exit()
+if not SPREADSHEET_ID:
+  log.error("Failed to get SPREADSHEET_ID")
+  exit()
+if not ADMIN_ID:
+  log.error("Failed to get ADMIN_ID")
+  exit()
+if "private_key.json" not in os.listdir("private/"):
+  log.error("private_key.json not found in the private/ directory")
+  exit()
 
-guild_id = os.getenv('GUILD_ID')
-if not guild_id:
-    log.fatal("Unable to get GUILD_ID")
-    exit()
-guild_id = int(guild_id)
-log.info(f"Loaded GUILD_ID - {guild_id}")
-guild = Object(guild_id)
-
-# Declarations -> None
+log.info("Initializing client...")
 intents: Intents = Intents.default()
 intents.members = True
 client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
-get_commands(tree, guild)
-get_events(client)
 
+log.info("Initializing command tree...")
+get_commands(tree, Object(int(GUILD_ID)), db=Database(SPREADSHEET_ID))
+# get_events(client)
 
 @client.event
 async def on_ready() -> None:
     try:
-        guild = await client.fetch_guild(guild_id)
+        guild = await client.fetch_guild(int(GUILD_ID))
         synced = await tree.sync(guild=guild)
         log.info(f"Synced {len(synced)} command(s)...")
         log.info(f"{client.user} is now running")
@@ -45,12 +50,11 @@ async def on_ready() -> None:
         log.fatal(f"Failed to start\n\n{e}\n\n")
 
 def main() -> None:
-    try:
-        log.info("Running health checks...")
-        db_healthy()
-        client.run(token=TOKEN)
-    except Exception as e:
-        raise e
+  try:
+    connect_to_db(SPREADSHEET_ID)
+    client.run(token=DISCORD_TOKEN)
+  except Exception as e:
+    raise e
 
 if __name__ == '__main__':
-    main()
+  main()
