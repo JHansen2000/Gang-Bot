@@ -9,8 +9,8 @@
 ## Current Task:
 - On Gang Create (and vice versa for delete)
   - Create channel tree and set permissions
-- Add mapping for roles to power for custom gang roles (creation definitely belongs in a modal)
-  - Make sure this is SORTED based on role equivalent (HEAPSORT)
+- Check role mapping and group verification
+- Added parameter choices to all commands
 
 ## TODO
 - Create following event handlers:
