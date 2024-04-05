@@ -1,14 +1,22 @@
-from urllib import request
+import os
+from dotenv import load_dotenv
+
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
+from archive.sheets import get_all_gangs
 from utility import get_role
 import pandas as pd
+from datetime import date
 from logger import Logger
 log = Logger()
 
 BOT_DATA_HEADERS = ["Name", "RID", "CID", "MIDs", "CRIDs", "Created", "Modified"]
 GANG_DATA_HEADERS = ["ID", "Name", "Rank", "IBAN"]
+
+load_dotenv()
+ADMIN_ID = os.getenv("ADMIN_ID")
+if not ADMIN_ID: raise Exception("Unable to get ADMIN_ID")
 
 def connect_to_db(SPREADSHEET_ID: str) -> Spreadsheet:
   log.info(f"Connecting to database - {SPREADSHEET_ID}")
@@ -28,13 +36,34 @@ def connect_to_db(SPREADSHEET_ID: str) -> Spreadsheet:
     log.info("bot_data sheet created")
   return spreadsheet
 
+def isAdmin(member: discord.Member)-> bool:
+    admin_role = get_role(member.guild, ADMIN_ID)
+    return True if admin_role in member.roles else False
+
 def get_as_dataframe(worksheet: Worksheet) -> pd.DataFrame:
   values = worksheet.get_values()
   dataframe = pd.DataFrame(values[1:], columns=values[0])
   return dataframe
 
-def get_dataframe_at(input: pd.DataFrame, id: int, value: str):
-  return eval(input.loc[input["RID"] == str(id), value].array[0])
+def get_df_at(input: pd.DataFrame, id: int, key: str, value: str):
+  retVal: str = input.loc[input[key] == str(id), value].array[0]
+  return eval(retVal)
+
+def get_df_row(input: pd.DataFrame, id: int, key: str) -> list[str]:
+  return input.index[input[key] == str(id)].tolist()
+
+def get_power(member: discord.Member, roles: dict[str, int], skipAdmin: bool = False) -> int:
+  if not skipAdmin and isAdmin(member):
+      log.info(f"@{member.name} is an admin")
+      return 5
+
+  power = 0
+  for role in member.roles:
+    role_power = roles.get(str(role.id))
+    if role_power:
+        power = max(role_power, power)
+  log.info(f"@{member.name} has power {power}")
+  return power
 
 class Database:
   def __init__(self, SPREADSHEET_ID: str):
@@ -45,31 +74,49 @@ class Database:
     self.sheetnames = [ws.title for ws in self.worksheets]
     self.sheetids = [ws.id for ws in self.worksheets]
 
-    self.bot_sheet = self.worksheets.pop(self.get_worksheet_index('bot_data'))
+    bot_index = self.get_worksheet_index('bot_data')
+    self.bot_sheet = self.worksheets.pop(bot_index)
     self.bot_df = get_as_dataframe(self.bot_sheet)
+    self.sheetnames.pop(bot_index)
+    self.sheetids.pop(bot_index)
 
-    print(self.worksheets)
-    print(self.bot_sheet)
+    self.print_vars()
     log.info("Database initialized")
 
-  def get_power(self):
-    return
+  def print_vars(self) -> None:
+    print('\n')
+    print(self.SPREADSHEET_ID)
+    print(self.spreadsheet)
+    print(self.worksheets)
+    print(self.sheetnames)
+    print(self.sheetids)
+    print(self.bot_sheet)
+    print(self.bot_df)
+    print('\n')
 
   def get_gang_df(self, gang_name: str) -> pd.DataFrame:
-    log.info(f"Getting {gang_name} dataframe...")
+    log.info(f"Getting '{gang_name}' as dataframe...")
     for worksheet in self.worksheets:
       if worksheet.title == gang_name:
         return get_as_dataframe(worksheet)
     raise Exception(f"Couldn't find gang called {gang_name}")
 
+  def get_all_RIDs(self) -> list[str]:
+    return self.bot_df['RID'].to_list()
+
   def get_all_gangs(self, guild: discord.Guild) -> list[discord.Role]:
     log.info("Getting all gangs...")
-    all_RIDs = self.bot_df['RID'].to_list()
+    all_RIDs = self.get_all_RIDs()
     return [get_role(guild, rid) for rid in all_RIDs]
 
-  def get_category_id(self, role: discord.Role) -> str:
+  def get_gangs(self, member: discord.Member) -> list[discord.Role]:
+    gang_roles = self.bot_df['Name'].to_list()
+    matching_gangs = [role for role in member.roles if role.name in gang_roles]
+    return matching_gangs
+
+  def get_cid(self, role: discord.Role) -> str:
     log.info(f"Getting CID for @{role.name}")
-    cid = get_dataframe_at(self.bot_df, role.id, "CID")
+    cid = get_df_at(self.bot_df, role.id, "RID", "CID")
     return cid
 
   def get_worksheet_index(self, sheetname: str) -> int:
@@ -78,17 +125,109 @@ class Database:
         return self.worksheets.index(worksheet)
     raise Exception(f"Couldn't find worksheet called {sheetname}")
 
-  def get_subrole_ids(self, role: discord.Role) -> dict[str, str]:
+  def get_crids(self, role: discord.Role) -> dict[str, int]:
     log.info(f"Getting subroles for @{role.name}")
-    subrole_ids: dict[str, str] = get_dataframe_at(self.bot_df, role.id, "CRIDs")
-    return subrole_ids
+    crids: dict[str, int] = get_df_at(self.bot_df, role.id, "RID", "CRIDs")
+    return crids
 
-  def update_bot(self, ):
-    # Next task
-    return
+  def get_subroles(self, role: discord.Role, guild: discord.Guild) -> list[discord.Role]:
+    roles = []
+    for crid in self.get_crids(role):
+      found = guild.get_role(int(crid))
+      if not found:
+        log.error(f"Failed to get role with ID: {crid}")
+        continue
+      roles.append(found)
+    return roles
 
-  def update_gang(self):
-    return
+  def update_bot(self,
+                 role: discord.Role,
+                 gang_map: dict[str, int] | None = None,
+                 category: discord.CategoryChannel | None = None) -> pd.DataFrame:
+    log.info(f"Updating database...")
+    if BOT_DATA_HEADERS != self.bot_df.columns.tolist():
+      raise Exception(f"'bot_data' does not have the correct headers")
+
+    name = role.name
+    rid = str(role.id)
+    mids = [mem.id for mem in role.members]
+    modified = date.today()
+
+    if category:
+      cid = str(category.id)
+    else:
+      cid = self.get_cid(role)
+
+    if gang_map:
+      gmap = str(gang_map)
+    else:
+      gmap = str(self.get_crids(role))
+
+    row = get_df_row(self.bot_df, role.id, "RID")
+    if len(row) < 1:
+      log.info(f"Role {role.name} is new to '{self.bot_sheet.title}'")
+      row = len(self.bot_df)
+      created = modified
+    else:
+      created = get_df_at(self.bot_df, role.id, "RID", "Created")
+
+    role_data = [name, rid, cid, mids, gmap, created, modified]
+    self.bot_df.loc[row] = role_data
+
+    set_with_dataframe(self.bot_sheet, self.bot_df, resize=True)
+    log.info("Update successful")
+    return self.bot_df
+
+  def update_gang(self,
+                  gang_name: str,
+                  member: discord.Member,
+                  delete: bool) -> pd.DataFrame:
+    log.info(f"Updating worksheet '{gang_name}'...")
+    worksheet = self.worksheets[self.get_worksheet_index(gang_name)]
+    dataframe = self.get_gang_df(gang_name)
+
+    if GANG_DATA_HEADERS != dataframe.columns.tolist():
+      raise Exception(f"'{gang_name}' does not have the correct headers")
+
+    if delete:
+      dataframe = dataframe.loc[dataframe['ID'] != str(member.id)]
+      set_with_dataframe(worksheet, dataframe, resize=True)
+      log.info("Update successful")
+      return dataframe
+
+    for gang in get_all_gangs(member.guild):
+      if gang.name == gang_name:
+        gang_role = gang
+        break
+    if not gang_role:
+      raise Exception(f"@{member.name} does not belong to @{gang_name}")
+
+    crids: dict[str, int] = get_df_at(self.bot_df, gang_role.id, "RID", "CRIDs")
+    power = get_power(member, crids, skipAdmin=True)
+    if power < 1:
+      raise Exception(f"User doesn't have a subrole")
+
+    subrole = get_role(member.guild, list(crids.keys())[list(crids.values()).index(power)])
+
+    mid = str(member.id)
+    name = member.nick if member.nick else member.name
+    rank = subrole.name
+
+    row = get_df_row(dataframe, member.id, "ID")
+    if len(row) < 1:
+      log.info(f"Member {name} is new to '{gang_name}'")
+      row_index = len(dataframe)
+      iban = "None"
+    else:
+      iban = get_df_at(dataframe, member.id, "ID", "IBAN")
+      iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].array[0]
+
+    member_data = [mid, name, rank, iban]
+    dataframe.loc[row_index] = member_data
+
+    set_with_dataframe(worksheet, dataframe, resize=True)
+    log.info("Update successful")
+    return dataframe
 
   def create_sheet(self, worksheetName: str) -> Worksheet:
     if worksheetName in self.sheetnames:
@@ -107,50 +246,23 @@ class Database:
     self.worksheets.append(newSheet)
     self.sheetnames.append(newSheet.title)
     self.sheetids.append(newSheet.id)
+    self.spreadsheet.fetch_sheet_metadata()
     return newSheet
 
-  async def create_role(self,
-                        guild: discord.Guild,
-                        roleName: str,
-                        hoisted: bool = True) -> discord.Role:
-    newRole = await guild.create_role(name=roleName, hoist=hoisted, mentionable=True)
-    return newRole
+  def delete_sheet(self, sheetname: str, role: discord.Role | None = None) -> None:
+    if role:
+      log.info(f"Removing gang '{sheetname}' from database...")
+      self.bot_df = self.bot_df.loc[self.bot_df['RID'] != str(role.id)]
+      set_with_dataframe(self.bot_sheet, self.bot_df, resize=True)
 
-  async def create_category(self,
-                            guild: discord.Guild,
-                            role: discord.Role) -> discord.CategoryChannel:
-    newCategory = await guild.create_category(
-      role.name,
-      overwrites= {
-        guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        role: discord.PermissionOverwrite(read_messages=True)
-      })
-    return newCategory
-
-  async def create_subroles(self,
-                            guild: discord.Guild,
-                            role: discord.Role,
-                            rmap: dict[str, str]) -> dict[str, str]:
-    newMap: dict[str, str] = {}
-    for key, value in rmap.items():
-      newName = f"{role.name} - {value}"
-      power = rmap.get(key)
-
-      if not power:
-        raise Exception(f"Could not find {key} in role map")
-
-      newRole = await self.create_role(guild, newName, hoisted=False)
-      newMap[str(newRole.id)] = power
-    return newMap
-
-  def delete_sheet(self, sheetname: str) -> None:
-    log.info(f"Deleting {sheetname} dataframe...")
+    log.info(f"Deleting worksheet '{sheetname}'...")
     for i, worksheet in enumerate(self.worksheets):
       if worksheet.title == sheetname:
         self.worksheets.pop(i)
         self.sheetnames.pop(i)
         self.sheetids.pop(i)
         self.spreadsheet.del_worksheet(worksheet)
+        return
     raise Exception(f"Couldn't find worksheet called {sheetname}")
 
   def reset_data(self) -> None:
@@ -165,3 +277,20 @@ class Database:
     self.spreadsheet.batch_update({"requests": reqs})
     self.__init__(self.SPREADSHEET_ID)
 
+  def can_execute(self,
+                  member: discord.Member,
+                  required_power: int,
+                  target: discord.Role | None = None) -> bool:
+    if not target:
+      if isAdmin(member):
+          return True
+      return False
+
+    roles = self.get_crids(target)
+    matching_gangs = self.get_gangs(member)
+
+    if target not in matching_gangs and not isAdmin(member):
+        log.warning(f"@{member.name} doesn't belong to @{target.name} gang")
+        return False
+
+    return True if get_power(member, roles) >= required_power else False

@@ -36,7 +36,7 @@ client: Client = Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 log.info("Initializing command tree...")
-get_commands(tree, Object(int(GUILD_ID)), db=Database(SPREADSHEET_ID))
+get_commands(tree, Database(SPREADSHEET_ID), guild=Object(int(GUILD_ID)))
 # get_events(client)
 
 @client.event
