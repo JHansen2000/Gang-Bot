@@ -1,10 +1,8 @@
 import os
 from dotenv import load_dotenv
-
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
-from archive.sheets import get_all_gangs
 from utility import get_role
 import pandas as pd
 from datetime import date
@@ -56,14 +54,14 @@ def get_df_at(input: pd.DataFrame,
 def get_df_row(input: pd.DataFrame, id: int, key: str) -> list[str]:
   return input.index[input[key] == str(id)].tolist()
 
-def get_power(member: discord.Member, roles: dict[str, int], skipAdmin: bool = False) -> int:
+def get_power(member: discord.Member, subroles: dict[str, int], skipAdmin: bool = False) -> int:
   if not skipAdmin and isAdmin(member):
       log.info(f"@{member.name} is an admin")
       return 5
 
   power = 0
   for role in member.roles:
-    role_power = roles.get(str(role.id))
+    role_power = subroles.get(str(role.id))
     if role_power:
         power = max(role_power, power)
   log.info(f"@{member.name} has power {power}")
@@ -213,14 +211,14 @@ class Database:
       log.info("Update successful")
       return dataframe
 
-    for gang in get_all_gangs(member.guild):
+    for gang in self.get_all_gangs(member.guild):
       if gang.name == gang_name:
         gang_role = gang
         break
     if not gang_role:
       raise Exception(f"@{member.name} does not belong to @{gang_name}")
 
-    crids: dict[str, int] = get_df_at(self.bot_df, gang_role.id, "RID", "CRIDs")
+    crids: dict[str, int] = get_df_at(self.bot_df, gang_role.id, "RID", "CRIDs", read_dict=True)
     power = get_power(member, crids, skipAdmin=True)
     if power < 1:
       raise Exception(f"User doesn't have a subrole")

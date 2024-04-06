@@ -9,10 +9,8 @@ log = Logger()
 def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
                  db: sheets.Database,
                  guild: discord.Object | None = None):
-  if len(db.sheetnames) < 1: # Move this functionality into a db var
-    role_choices=[discord.app_commands.Choice(name="No gangs exist", value="")]
-  else:
-    role_choices=[discord.app_commands.Choice(name=sheets.get_df_at(db.bot_df, int(rid), "RID", "Name"), value=rid) for rid in db.get_all_RIDs()]
+       
+  dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour(16711680))
   
   @tree.command (
     name="reset",
@@ -37,11 +35,9 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       the role of the gang to print
     """
     try:
-      print(gang)
       await interaction.response.defer(ephemeral=True)
       if gang == "":
-          embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour(16711680))
-          await interaction.followup.send(embed=embed, view=discord.ui.View(), ephemeral=True)
+          await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
           return
 
       await interaction.followup.send(f"{db.bot_df.to_string(index=False)}", ephemeral=True)
@@ -85,7 +81,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     name="gang",
     description="Deletes role, roster, and channels for a gang",
   )
-  async def delete_gang(interaction: discord.Interaction, role: discord.Role) -> None:
+  async def delete_gang(interaction: discord.Interaction, gang: str) -> None:
     """Deletes everything associated with a gang, primarily:
     - Discord Role
     - Roster
@@ -100,6 +96,14 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       log.info("Command Received: /gang delete")
       await interaction.response.defer(ephemeral=True)
 
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
+
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+
       if not db.can_execute(interaction.user, 5, role): # type: ignore
         await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
         return
@@ -107,9 +111,6 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       if role.name not in db.sheetnames:
         await interaction.followup.send("The provided role must be for a gang", ephemeral=True)
         return
-
-      guild = interaction.guild
-      if not guild: raise Exception("Could not get guild")
 
       # Delete category
       cid = db.get_cid(role)
@@ -131,6 +132,10 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       await interaction.followup.send("Command failed", ephemeral=True)
       raise e
 
+  @delete_gang.autocomplete("gang")
+  async def delete_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices()
+
   @delete_com.command (
     name="data",
     description="Delete Gang Bot's entire database",
@@ -139,7 +144,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     try:
       log.info("Command Received: /data delete")
 
-      if not sheets.can_execute(interaction.user, 5): # type: ignore
+      if not db.can_execute(interaction.user, 5): # type: ignore
         await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
         return
 
