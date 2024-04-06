@@ -9,7 +9,7 @@ log = Logger()
 def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
                  db: sheets.Database,
                  guild: discord.Object | None = None):
-  if len(db.sheetnames) < 1:
+  if len(db.sheetnames) < 1: # Move this functionality into a db var
     role_choices=[discord.app_commands.Choice(name="No gangs exist", value="")]
   else:
     role_choices=[discord.app_commands.Choice(name=sheets.get_df_at(db.bot_df, int(rid), "RID", "Name"), value=rid) for rid in db.get_all_RIDs()]
