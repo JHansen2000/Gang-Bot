@@ -45,9 +45,13 @@ def get_as_dataframe(worksheet: Worksheet) -> pd.DataFrame:
   dataframe = pd.DataFrame(values[1:], columns=values[0])
   return dataframe
 
-def get_df_at(input: pd.DataFrame, id: int, key: str, value: str):
-  retVal: str = input.loc[input[key] == str(id), value].array[0]
-  return eval(retVal)
+def get_df_at(input: pd.DataFrame, 
+              id: int | str, 
+              key: str, 
+              value: str, 
+              read_dict: bool = False):
+  retVal = input.loc[input[key] == str(id), value].array[0]
+  return eval(retVal) if read_dict else retVal
 
 def get_df_row(input: pd.DataFrame, id: int, key: str) -> list[str]:
   return input.index[input[key] == str(id)].tolist()
@@ -94,12 +98,26 @@ class Database:
     print(self.bot_df)
     print('\n')
 
-  def get_gang_df(self, gang_name: str) -> pd.DataFrame:
+  def get_gang_choices(self) -> list[discord.app_commands.Choice[str]]:
+    if len(self.sheetnames) < 1:
+      role_choices=[discord.app_commands.Choice(name="No gangs exist", value="")]
+    else:
+      role_choices=[discord.app_commands.Choice(name=gang_name, value=self.get_rid(gang_name)) for gang_name in self.sheetnames]
+    return role_choices
+
+  def get_gang_df(self, gang_name: str | int) -> pd.DataFrame:
+    if type(gang_name) == int:
+      gang_name = get_df_at(self.bot_df, gang_name, "RID", "Name")
+      
     log.info(f"Getting '{gang_name}' as dataframe...")
     for worksheet in self.worksheets:
       if worksheet.title == gang_name:
         return get_as_dataframe(worksheet)
     raise Exception(f"Couldn't find gang called {gang_name}")
+    
+  def get_rid(self, rolename: str) -> str:
+    id: str = get_df_at(self.bot_df, rolename, "Name", "RID")
+    return id
 
   def get_all_RIDs(self) -> list[str]:
     return self.bot_df['RID'].to_list()
@@ -127,7 +145,7 @@ class Database:
 
   def get_crids(self, role: discord.Role) -> dict[str, int]:
     log.info(f"Getting subroles for @{role.name}")
-    crids: dict[str, int] = get_df_at(self.bot_df, role.id, "RID", "CRIDs")
+    crids: dict[str, int] = get_df_at(self.bot_df, role.id, "RID", "CRIDs", read_dict=True)
     return crids
 
   def get_subroles(self, role: discord.Role, guild: discord.Guild) -> list[discord.Role]:

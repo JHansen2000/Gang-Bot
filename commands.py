@@ -13,7 +13,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     role_choices=[discord.app_commands.Choice(name="No gangs exist", value="")]
   else:
     role_choices=[discord.app_commands.Choice(name=sheets.get_df_at(db.bot_df, int(rid), "RID", "Name"), value=rid) for rid in db.get_all_RIDs()]
-
+  
   @tree.command (
     name="reset",
     description="reset all data",
@@ -28,8 +28,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     description="test command",
     guild=guild
   )
-  @discord.app_commands.choices(gang=role_choices)
-  async def test(interaction: discord.Interaction, gang: discord.app_commands.Choice[str]) -> None:
+  async def test(interaction: discord.Interaction, gang: str) -> None:
     """Test Command
 
     Parameters
@@ -38,18 +37,23 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       the role of the gang to print
     """
     try:
-      if gang.value == "":
+      print(gang)
+      await interaction.response.defer(ephemeral=True)
+      if gang == "":
           embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour(16711680))
-          await interaction.response.send_message(embed=embed, view=discord.ui.View(), ephemeral=True)
+          await interaction.followup.send(embed=embed, view=discord.ui.View(), ephemeral=True)
           return
 
-      await interaction.response.defer(ephemeral=True)
       await interaction.followup.send(f"{db.bot_df.to_string(index=False)}", ephemeral=True)
-      await interaction.followup.send(f"{db.get_gang_df(gang.name).to_string(index=False)}", ephemeral=True)
+      await interaction.followup.send(f"{db.get_gang_df(int(gang)).to_string(index=False)}", ephemeral=True)
 
     except Exception as e:
       await interaction.followup.send(f"Command failed", ephemeral=True)
       raise e
+
+  @test.autocomplete("gang")
+  async def test_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices()
 
   create_com = discord.app_commands.Group(name="create", description="Creation commands")
   @create_com.command (
