@@ -9,6 +9,7 @@ def get_events(client: Client, db: sheets.Database) -> None:
     # @client.event
     # async def on_member_update(before: Member, after: Member) -> None:
 
+    # Add listener for role deletion logging
     @client.event
     async def on_audit_log_entry_create(entry: AuditLogEntry) -> None:
         if entry.user and not entry.user.bot:
@@ -32,7 +33,6 @@ def get_events(client: Client, db: sheets.Database) -> None:
                     changed_role = post_roles[0]
                     delete = False
 
-
                 all_gangs = db.get_all_gangs(guild)
                 isGangRole = True if changed_role in all_gangs else False
                 if isGangRole:
@@ -40,7 +40,6 @@ def get_events(client: Client, db: sheets.Database) -> None:
                     db.update_gang(changed_role.name, member, delete)
                     log.info(f"Role @{changed_role.name} {message} '{member.name}'")
                     return
-
 
                 for gang in all_gangs:
                     gang_CRIDs = db.get_crids(gang)
