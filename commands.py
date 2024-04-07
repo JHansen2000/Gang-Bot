@@ -12,14 +12,14 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
        
   dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour(16711680))
   
-  @tree.command (
-    name="reset",
-    description="reset all data",
-    guild=guild
-  )
-  async def reset(interaction: discord.Interaction) -> None:
-    db.reset_data()
-    await interaction.response.send_message(f"{db.bot_df}", ephemeral=True)
+#   @tree.command (
+#     name="reset",
+#     description="reset all data",
+#     guild=guild
+#   )
+#   async def reset(interaction: discord.Interaction) -> None:
+#     db.reset_data()
+#     await interaction.response.send_message(f"{db.bot_df}", ephemeral=True)
 
   @tree.command (
     name="test",
@@ -105,7 +105,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       role = sheets.get_role(guild, gang)
 
       if not db.can_execute(interaction.user, 5, role): # type: ignore
-        await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
+        await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
         return
 
       if role.name not in db.sheetnames:

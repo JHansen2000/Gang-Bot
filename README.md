@@ -9,38 +9,12 @@
 ## Current Task:
 - On Gang Create (and vice versa for delete)
   - Create channel tree and set permissions
-- Check role mapping and group verification
-- Added parameter choices to all commands
+- Color selection embed before final result (EMBED COLOR SHOULD CHANGE WITH INPUT)
 
 ## TODO
-- Create following event handlers:
-  - User Nickname Change
-  - Role Color Modified
 - On Gang Create (and vice versa for delete)
   - Create channel tree and set permissions
   - Require color hex on creation
-  - Optional leader
   - Populate sheet with default data
 - Log changes in #audit-log channel
-- Map community rank to user-defined rank structure
-- Promote member
-- Demote member
-- Kick member
-- On init, create and log roles if they don't exist
-- Change rank structure roles
 - Disallow creation of gangs with same name as ranks
-
-## Done
-- Pong a pinging user
-- Identify commands from admins
-- Auto create 'bot_data' sheet on db_health_check if it doesn't exist
-- Update a remote roster (google sheets w/ pandas)
-- On Gang Create (and vice versa for delete)
-  - Verify that role IS a gang
-  - Populate sheet with headers only
-- Update worksheet command (role | none, category | none, etc.)
-
-## Ideas
-- Custom tags for positions
-  - Can I hide roles? No
--

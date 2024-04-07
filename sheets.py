@@ -48,24 +48,13 @@ def get_df_at(input: pd.DataFrame,
               key: str, 
               value: str, 
               read_dict: bool = False):
-  retVal = input.loc[input[key] == str(id), value].array[0]
+  retArray = input.loc[input[key] == str(id), value].array
+  if len(retArray) < 1: raise Exception(f"Could not get df value ({id, key, value, read_dict}) ")
+  retVal = retArray[0]
   return eval(retVal) if read_dict else retVal
 
 def get_df_row(input: pd.DataFrame, id: int, key: str) -> list[str]:
   return input.index[input[key] == str(id)].tolist()
-
-def get_power(member: discord.Member, subroles: dict[str, int], skipAdmin: bool = False) -> int:
-  if not skipAdmin and isAdmin(member):
-      log.info(f"@{member.name} is an admin")
-      return 5
-
-  power = 0
-  for role in member.roles:
-    role_power = subroles.get(str(role.id))
-    if role_power:
-        power = max(role_power, power)
-  log.info(f"@{member.name} has power {power}")
-  return power
 
 class Database:
   def __init__(self, SPREADSHEET_ID: str):
@@ -82,7 +71,7 @@ class Database:
     self.sheetnames.pop(bot_index)
     self.sheetids.pop(bot_index)
 
-    self.print_vars()
+    # self.print_vars()
     log.info("Database initialized")
 
   def print_vars(self) -> None:
@@ -95,6 +84,26 @@ class Database:
     print(self.bot_sheet)
     print(self.bot_df)
     print('\n')
+
+  def get_power(self, 
+                member: discord.Member, 
+                subroles: dict[str, int],
+                opt_role: discord.Role | None = None,
+                skipAdmin: bool = False) -> int:
+    if not skipAdmin and isAdmin(member):
+      log.info(f"@{member.name} is an admin")
+      return 5
+
+    power = 0
+    member_roles = member.roles
+    if opt_role:
+        member_roles.append(opt_role)
+    for role in member_roles:
+        role_power = subroles.get(str(role.id))
+        if role_power:
+          power = max(role_power, power)
+    log.info(f"@{member.name} has power {power}")
+    return power
 
   def get_gang_choices(self) -> list[discord.app_commands.Choice[str]]:
     if len(self.sheetnames) < 1:
@@ -155,6 +164,20 @@ class Database:
         continue
       roles.append(found)
     return roles
+
+  def get_subrole(self, role: discord.Role, member: discord.Member) -> discord.Role:
+    subrole_ids = [sub.id for sub in self.get_subroles(role, member.guild)]
+    for member_role in member.roles:
+      if member_role.id in subrole_ids:
+        return member_role
+    raise Exception(f"@{member.name} does not have a subrole")
+
+  def get_gang_from_subrole(self, guild: discord.Guild, role: discord.Role) -> discord.Role:
+    gang_name = role.name.split('-')[0].strip()
+    rid = get_df_at(self.bot_df, gang_name, "Name", "RID")
+    gang_role = guild.get_role(int(rid))
+    if not gang_role: raise Exception(f"Failed to get role with ID {rid}")
+    return gang_role
 
   def update_bot(self,
                  role: discord.Role,
@@ -219,7 +242,7 @@ class Database:
       raise Exception(f"@{member.name} does not belong to @{gang_name}")
 
     crids: dict[str, int] = get_df_at(self.bot_df, gang_role.id, "RID", "CRIDs", read_dict=True)
-    power = get_power(member, crids, skipAdmin=True)
+    power = self.get_power(member, crids, skipAdmin=True)
     if power < 1:
       raise Exception(f"User doesn't have a subrole")
 
@@ -227,19 +250,19 @@ class Database:
 
     mid = str(member.id)
     name = member.nick if member.nick else member.name
-    rank = subrole.name
+    rank = subrole.name.split('-')[1].strip()
 
     row = get_df_row(dataframe, member.id, "ID")
     if len(row) < 1:
       log.info(f"Member {name} is new to '{gang_name}'")
-      row_index = len(dataframe)
+      row = len(dataframe)
       iban = "None"
     else:
       iban = get_df_at(dataframe, member.id, "ID", "IBAN")
       iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].array[0]
 
     member_data = [mid, name, rank, iban]
-    dataframe.loc[row_index] = member_data
+    dataframe.loc[row] = member_data
 
     set_with_dataframe(worksheet, dataframe, resize=True)
     log.info("Update successful")
@@ -294,19 +317,18 @@ class Database:
     self.__init__(self.SPREADSHEET_ID)
 
   def can_execute(self,
-                  member: discord.Member,
-                  required_power: int,
-                  target: discord.Role | None = None) -> bool:
-    if not target:
-      if isAdmin(member):
-          return True
-      return False
-
-    roles = self.get_crids(target)
-    matching_gangs = self.get_gangs(member)
-
-    if target not in matching_gangs and not isAdmin(member):
-        log.warning(f"@{member.name} doesn't belong to @{target.name} gang")
-        return False
-
-    return True if get_power(member, roles) >= required_power else False
+                  caller: discord.Member,
+                  role: discord.Role,
+                  requirement: int,
+                  isEvent: bool = False) -> bool:
+    
+    if isAdmin(caller):
+      return True
+    
+    if isEvent:
+        gang_role = self.get_gang_from_subrole(caller.guild, role)
+        if gang_role not in caller.roles:
+            log.warning(f"@{caller.name} does not have permission to use this command")
+            return False
+        return True if self.get_power(caller, self.get_crids(gang_role)) >= requirement else False
+    return True if self.get_power(caller, self.get_crids(role)) >= requirement else False
