@@ -52,7 +52,6 @@ async def on_ready() -> None:
 
 def main() -> None:
   try:
-    connect_to_db(SPREADSHEET_ID)
     client.run(token=DISCORD_TOKEN)
   except Exception as e:
     raise e
