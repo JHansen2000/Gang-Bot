@@ -36,20 +36,29 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     """
     try:
       await interaction.response.defer(ephemeral=True)
-      if gang == "":
-          await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
-          return
+      guild = interaction.guild
+      if not guild: raise Exception()
 
-      await interaction.followup.send(f"{db.bot_df.to_string(index=False)}", ephemeral=True)
-      await interaction.followup.send(f"{db.get_gang_df(int(gang)).to_string(index=False)}", ephemeral=True)
+
+      allRoles = list(guild.roles)
+      newRole = await guild.create_role(name=gang)
+      bottomRole = guild.roles[-1]
+      # await newRole.edit(position=len(db.sheetnames) + 1)
+    #   print("move 1")
+    #   await newRole.edit(position=1)
+    #   print("move 2")
+    #   await bottomRole.edit(position=2)
+      allRoles.append(newRole)
+      guild.edit_role_positions(allRoles)
+      await interaction.followup.send("Done", ephemeral=True)
 
     except Exception as e:
       await interaction.followup.send(f"Command failed", ephemeral=True)
       raise e
 
-  @test.autocomplete("gang")
-  async def test_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
-    return db.get_gang_choices()
+#   @test.autocomplete("gang")
+#   async def test_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+#     return db.get_gang_choices()
 
   create_com = discord.app_commands.Group(name="create", description="Creation commands")
   @create_com.command (
