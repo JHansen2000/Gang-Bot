@@ -9,17 +9,8 @@ log = Logger()
 def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
                  db: sheets.Database,
                  guild: discord.Object | None = None):
-       
+
   dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour(16711680))
-  
-#   @tree.command (
-#     name="reset",
-#     description="reset all data",
-#     guild=guild
-#   )
-#   async def reset(interaction: discord.Interaction) -> None:
-#     db.reset_data()
-#     await interaction.response.send_message(f"{db.bot_df}", ephemeral=True)
 
   @tree.command (
     name="test",
@@ -36,25 +27,15 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     """
     try:
       await interaction.response.defer(ephemeral=True)
+
       guild = interaction.guild
       if not guild: raise Exception()
-      newRole = await guild.create_role(name=gang)
-      roleMap = {newRole: 1}
-      for i,role in enumerate (guild.roles):
-        roleMap [role] = i + 2
 
-      print (roleMap)
-
-
-      #allRoles = list(guild.roles)
-      #bottomRole = guild.roles[-1]
-      # await newRole.edit(position=len(db.sheetnames) + 1)
-    #   print("move 1")
-    #   await newRole.edit(position=1)
-    #   print("move 2")
-    #   await bottomRole.edit(position=2)
-     # allRoles.append(newRole)
-      await guild.edit_role_positions(roleMap)#type: ignore
+      rid = db.get_rid('The Staggs')
+      role = guild.get_role(int(rid))
+      if not role: raise Exception()
+      subroles = db.get_subroles(role, guild)
+      print(subroles)
       await interaction.followup.send("Done", ephemeral=True)
 
     except Exception as e:
@@ -78,6 +59,8 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     """
     try:
       log.info("Command Received: /create gang")
+
+
 
       if not db.can_execute(interaction.user, 5, None): # type: ignore
         await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
@@ -158,7 +141,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     try:
       log.info("Command Received: /data delete")
 
-      if not db.can_execute(interaction.user, 5): # type: ignore
+      if not db.can_execute(interaction.user, 5, None): # type: ignore
         await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
         return
 
@@ -254,16 +237,21 @@ class CreateGangForm(discord.ui.Modal, title="Create Gang"):
       return
 
     self.db.create_sheet(gang_name)
-    newRole = await utility.create_role(guild, gang_name)
+    newRole = await self.db.create_role(guild, gang_name)
     newMap = {
       string.capwords(str(self.gl_name).strip()): 4,
       string.capwords(str(self.hc_name).strip()): 3,
       string.capwords(str(self.m_name).strip()): 2,
       string.capwords(str(self.ha_name).strip()): 1
       }
-    newMap = await utility.create_subroles(guild, newRole, newMap)
+    newMap = await self.db.create_subroles(guild, newRole, newMap)
     newCategory = await utility.create_category(guild, newRole)
+    dataframe = self.db.update_bot(newRole, newMap, category=newCategory)
 
-    dataframe = self.db.update_bot(newRole, newMap, newCategory)
-    self.db.print_vars()
-    await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {newCategory.mention}", ephemeral=True)
+    subroles = self.db.get_subroles(newRole, guild)
+    await utility.edit_gang_category(newCategory, subroles)
+    channels = await utility.create_gang_channels(guild, newRole, subroles, newCategory)
+
+    roster = channels[0]
+    radio = channels[1]
+    await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {roster.mention}", ephemeral=True)

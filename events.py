@@ -53,8 +53,8 @@ def get_events(client: Client, db: sheets.Database) -> None:
 
                 if sheets.isAdmin(caller):
                     canExecute = True
-                elif isGangRole: 
-                    canExecute = db.can_execute(caller, changed_role, 3, isEvent=False)
+                elif isGangRole:
+                    canExecute = db.can_execute(caller, 3, changed_role, isEvent=False)
                     crids = db.get_crids(changed_role)
                     if db.get_power(caller, crids) <= db.get_power(member, crids):
                         canExecute = False
@@ -100,5 +100,5 @@ def get_events(client: Client, db: sheets.Database) -> None:
 
         else:
             if entry.action is AuditLogAction.role_delete:
-                log.info(f"Bot deleted role: {entry.changes}")
-            log.warning(str(entry.action))
+                log.info(f"Bot deleted role: {entry.changes.before.name}")
+            # log.warning(str(entry.action))

@@ -8,10 +8,7 @@
 
 ## Current Task:
 - On Gang Create (and vice versa for delete)
-  - Create channel tree and set permissions
-  - Create UNCHANGEABLE roster channel
     - Populate roster from database (callback from `update_gang()`)
-  - Create radio channel
 - Color selection embed before final result (EMBED COLOR SHOULD CHANGE WITH INPUT)
 
 ## TODO
