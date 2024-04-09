@@ -38,18 +38,23 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       await interaction.response.defer(ephemeral=True)
       guild = interaction.guild
       if not guild: raise Exception()
-
-
-      allRoles = list(guild.roles)
       newRole = await guild.create_role(name=gang)
-      bottomRole = guild.roles[-1]
+      roleMap = {newRole: 1}
+      for i,role in enumerate (guild.roles):
+        roleMap [role] = i + 2
+
+      print (roleMap)
+
+
+      #allRoles = list(guild.roles)
+      #bottomRole = guild.roles[-1]
       # await newRole.edit(position=len(db.sheetnames) + 1)
     #   print("move 1")
     #   await newRole.edit(position=1)
     #   print("move 2")
     #   await bottomRole.edit(position=2)
-      allRoles.append(newRole)
-      guild.edit_role_positions(allRoles)
+     # allRoles.append(newRole)
+      await guild.edit_role_positions(roleMap)#type: ignore
       await interaction.followup.send("Done", ephemeral=True)
 
     except Exception as e:
