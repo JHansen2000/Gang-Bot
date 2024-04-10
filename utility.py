@@ -1,5 +1,5 @@
-from re import M
-from discord import Guild, Role, PermissionOverwrite, CategoryChannel, TextChannel
+import pandas as pd
+from discord import Guild, Role, CategoryChannel, TextChannel, Member
 from logger import Logger
 log = Logger()
 
@@ -7,6 +7,15 @@ def get_role(guild: Guild, id: str) -> Role:
   role = guild.get_role(int(id))
   if not role: raise Exception("Could not get role")
   return role
+
+def get_rid_by_name(member: Member, name: str) -> int:
+  return [role.id for role in member.roles if role.name == name][0]
+
+def get_category(guild: Guild, cid: str) -> CategoryChannel:
+  category = [cat for cat in guild.categories if str(cat.id == cid)][0]
+  if not category:
+    raise Exception("Couldn't get category")
+  return category
 
 async def create_category(guild: Guild, role: Role) -> CategoryChannel:
   log.info(f"Creating category '{role.name}'...")
@@ -29,35 +38,6 @@ async def create_category(guild: Guild, role: Role) -> CategoryChannel:
     speak=True
     )
   return newCategory
-
-async def edit_gang_category(category: CategoryChannel, subroles: list[Role]) -> None:
-  # @Gang Leader
-  await category.set_permissions(subroles[0],
-    manage_channels=True,
-    manage_messages=True,
-    mute_members=True,
-    deafen_members=True,
-    move_members=True,
-    manage_permissions=True,
-    view_channel=True,
-    read_messages=True,
-    read_message_history=True,
-    send_messages=True,
-    connect=True,
-    speak=True)
-
-  # @High Command
-  await category.set_permissions(subroles[1],
-    manage_messages=True,
-    mute_members=True,
-    deafen_members=True,
-    move_members=True,
-    view_channel=True,
-    read_messages=True,
-    read_message_history=True,
-    send_messages=True,
-    connect=True,
-    speak=True)
 
 async def create_gang_channels(guild: Guild, role: Role, subroles: list[Role], category: CategoryChannel) -> list[TextChannel]:
   log.info(f"Creating channel tree for '{role.name}'...")
@@ -168,11 +148,34 @@ async def create_gang_channels(guild: Guild, role: Role, subroles: list[Role], c
 
   return [roster, radio]
 
-def get_category(guild: Guild, cid: str) -> CategoryChannel:
-  category = [cat for cat in guild.categories if str(cat.id == cid)][0]
-  if not category:
-    raise Exception("Couldn't get category")
-  return category
+async def update_gang_category(category: CategoryChannel, subroles: list[Role]) -> None:
+  # @Gang Leader
+  await category.set_permissions(subroles[0],
+    manage_channels=True,
+    manage_messages=True,
+    mute_members=True,
+    deafen_members=True,
+    move_members=True,
+    manage_permissions=True,
+    view_channel=True,
+    read_messages=True,
+    read_message_history=True,
+    send_messages=True,
+    connect=True,
+    speak=True)
+
+  # @High Command
+  await category.set_permissions(subroles[1],
+    manage_messages=True,
+    mute_members=True,
+    deafen_members=True,
+    move_members=True,
+    view_channel=True,
+    read_messages=True,
+    read_message_history=True,
+    send_messages=True,
+    connect=True,
+    speak=True)
 
 async def delete_category(guild: Guild, cid: str) -> None:
   category = get_category(guild, cid)

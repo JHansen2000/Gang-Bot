@@ -1,16 +1,19 @@
+from lib2to3.fixes.fix_has_key import FixHasKey
+from optparse import Values
 import os
 from dotenv import load_dotenv
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
-from utility import get_role
+from utility import get_rid_by_name, get_role
+from table2ascii import Alignment, table2ascii as t2a, PresetStyle
 import pandas as pd
 from datetime import date
 from logger import Logger
 log = Logger()
 
 BOT_DATA_HEADERS = ["Name", "RID", "CID", "RoCID", "RaCID", "MIDs", "CRIDs", "Created", "Modified"]
-GANG_DATA_HEADERS = ["ID", "Name", "Rank", "IBAN"]
+GANG_DATA_HEADERS = ["ID", "Name", "Rank", "RID", "IBAN"]
 
 load_dotenv()
 ADMIN_ID = os.getenv("ADMIN_ID")
@@ -55,6 +58,19 @@ def get_df_at(input: pd.DataFrame,
 
 def get_df_row(input: pd.DataFrame, id: int, key: str) -> list[str]:
   return input.index[input[key] == str(id)].tolist()
+
+async def update_roster(channel: discord.TextChannel, df: pd.DataFrame) -> None:
+  printable = df[["Name", "Rank", "IBAN"]]
+
+  output = t2a(
+    header = printable.columns.tolist(),
+    body = printable.values.tolist(),
+    style = PresetStyle.thin_compact,
+    alignments = [Alignment.LEFT, Alignment.LEFT, Alignment.RIGHT],
+    first_col_heading = True
+    )
+  await channel.purge()
+  await channel.send(f"```{output}```", silent=True)
 
 class Database:
   def __init__(self, SPREADSHEET_ID: str):
@@ -166,12 +182,16 @@ class Database:
       roles.append(found)
     return roles
 
-  def get_subrole(self, role: discord.Role, member: discord.Member) -> discord.Role:
+  def get_subrole(self, role: discord.Role, member: discord.Member, exclude: discord.Role | None = None) -> discord.Role | None:
     subrole_ids = [sub.id for sub in self.get_subroles(role, member.guild)]
     for member_role in member.roles:
       if member_role.id in subrole_ids:
-        return member_role
-    raise Exception(f"@{member.name} does not have a subrole")
+        if exclude:
+          if exclude.id != member_role.id:
+            return member_role
+        else:
+          return member_role
+    log.warning(f"@{member.name} does not have a subrole")
 
   def get_gang_from_subrole(self, guild: discord.Guild, role: discord.Role) -> discord.Role:
     gang_name = role.name.split('-')[0].strip()
@@ -239,7 +259,7 @@ class Database:
     if roster_cid:
       racid = str(radio_cid)
     else:
-      racid = str(get_df_at(self.bot_df, rid, "RID", "raCID"))
+      racid = str(get_df_at(self.bot_df, rid, "RID", "RaCID"))
 
     row = get_df_row(self.bot_df, role.id, "RID")
     if len(row) < 1:
@@ -290,18 +310,23 @@ class Database:
     mid = str(member.id)
     name = member.nick if member.nick else member.name
     rank = subrole.name.split('-')[1].strip()
+    rid = str(subrole.id)
 
     row = get_df_row(dataframe, member.id, "ID")
     if len(row) < 1:
       log.info(f"Member {name} is new to '{gang_name}'")
       row = len(dataframe)
+
       iban = "None"
     else:
       iban = get_df_at(dataframe, member.id, "ID", "IBAN")
-      iban = dataframe.loc[dataframe["ID"] == mid, "IBAN"].array[0]
 
-    member_data = [mid, name, rank, iban]
+    member_data = [mid, name, rank, rid, iban]
     dataframe.loc[row] = member_data
+    dataframe.sort_values(by="RID",
+                                 inplace=True,
+                                 ascending=False,
+                                 key=lambda values: [crids.get(value) for value in values.tolist()])
 
     set_with_dataframe(worksheet, dataframe, resize=True)
     log.info("Update successful")
@@ -354,8 +379,6 @@ class Database:
         for ws in self.worksheets]
 
     reqs = clr_req + del_req
-
-    print(reqs)
 
     log.info(f"Deleting {len(self.worksheets)} worksheets...")
     self.spreadsheet.batch_update({"requests": reqs})

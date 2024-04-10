@@ -46,6 +46,8 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
 #   async def test_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
 #     return db.get_gang_choices()
 
+
+
   create_com = discord.app_commands.Group(name="create", description="Creation commands")
   @create_com.command (
     name="gang",
@@ -160,7 +162,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       embed.add_field(name="This is a destructive action and cannot be reversed!", value="", inline=False)
 
       confirm = discord.ui.Button(style=discord.ButtonStyle.red, label="Delete")
-      confirm.callback = confirm_callback #type: ignore
+      confirm.callback = confirm_callback # type: ignore - not sure why I need this
       cancel = discord.ui.Button(style=discord.ButtonStyle.grey, label="Cancel")
       cancel.callback = cancel_callback
 
@@ -248,10 +250,10 @@ class CreateGangForm(discord.ui.Modal, title="Create Gang"):
     unpruned = [guild.get_role(int(rid)) for rid in newMap.keys()]
     subroles = [sr for sr in unpruned if sr is not None]
     newCategory = await utility.create_category(guild, newRole)
-    await utility.edit_gang_category(newCategory, subroles)
+    await utility.update_gang_category(newCategory, subroles)
     channels = await utility.create_gang_channels(guild, newRole, subroles, newCategory)
     roster = channels[0]
     radio = channels[1]
     dataframe = self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
-
+    await sheets.update_roster(roster, self.db.get_gang_df(gang_name))
     await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {roster.mention}", ephemeral=True)

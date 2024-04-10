@@ -18,3 +18,6 @@ class Logger:
     def fatal(self, message: str) -> None:
         print(f"{self.prefix} [FAT] - {message}")
         return
+
+    # def test(self, message: str) -> None:
+    #     print(f"[!!!] - {message} - [!!!]")
