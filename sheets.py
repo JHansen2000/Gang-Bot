@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
-import gspread
 from gspread_dataframe import set_with_dataframe
 from utility import get_role
 import pandas as pd

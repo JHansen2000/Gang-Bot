@@ -245,13 +245,13 @@ class CreateGangForm(discord.ui.Modal, title="Create Gang"):
       string.capwords(str(self.ha_name).strip()): 1
       }
     newMap = await self.db.create_subroles(guild, newRole, newMap)
+    unpruned = [guild.get_role(int(rid)) for rid in newMap.keys()]
+    subroles = [sr for sr in unpruned if sr is not None]
     newCategory = await utility.create_category(guild, newRole)
-    dataframe = self.db.update_bot(newRole, newMap, category=newCategory)
-
-    subroles = self.db.get_subroles(newRole, guild)
     await utility.edit_gang_category(newCategory, subroles)
     channels = await utility.create_gang_channels(guild, newRole, subroles, newCategory)
-
     roster = channels[0]
     radio = channels[1]
+    dataframe = self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
+
     await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {roster.mention}", ephemeral=True)
