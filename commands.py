@@ -2,6 +2,7 @@ import discord
 import string
 import utility
 import sheets
+import re
 from logger import Logger
 log = Logger()
 
@@ -9,7 +10,9 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
                  db: sheets.Database,
                  guild: discord.Object | None = None):
 
-  dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour(16711680))
+  dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour.red())
+  fail_embed = discord.Embed(title="Command Failed", description="Something went wrong, ask a Developer for help!", color=discord.Colour.red())
+  permission_embed = discord.Embed(title="Insufficient Permissions", description="You do not have permission to run this command!", color=discord.Colour.dark_red())
 
   @tree.command (
     name="test",
@@ -25,32 +28,33 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       the role of the gang to print
     """
     try:
+      log.info("Command Received: /test")
       await interaction.response.defer(ephemeral=True)
 
-      guild = interaction.guild
-      if not guild: raise Exception()
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
 
-      rid = db.get_rid('The Staggs')
-      role = guild.get_role(int(rid))
-      if not role: raise Exception()
-      subroles = db.get_subroles(role, guild)
-      print(subroles)
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+
+      if not db.can_execute(interaction.user, 4, role): # type: ignore
+        await interaction.followup.send(embed=permission_embed, ephemeral=True)
+        return
       await interaction.followup.send("Done", ephemeral=True)
 
     except Exception as e:
-      await interaction.followup.send(f"Command failed", ephemeral=True)
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
       raise e
-
-#   @test.autocomplete("gang")
-#   async def test_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
-#     return db.get_gang_choices()
-
-
+  @test.autocomplete("gang")
+  async def test_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices(interaction.guild)
 
   create_com = discord.app_commands.Group(name="create", description="Creation commands")
   @create_com.command (
     name="gang",
-    description="Creates a gang",
+    description="Creates a gang"
   )
   async def create_gang(interaction: discord.Interaction) -> None:
     """Creates all base resources for a gang including:
@@ -61,23 +65,21 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     try:
       log.info("Command Received: /create gang")
 
-
-
       if not db.can_execute(interaction.user, 5, None): # type: ignore
-        await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
+        await interaction.response.send_message(embed=permission_embed, ephemeral=True)
         return
 
       await interaction.response.send_modal(CreateGangForm(db))
 
     except Exception as e:
-      await interaction.followup.send("Command failed", ephemeral=True)
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
       raise e
   tree.add_command(create_com, guild=guild)
 
   delete_com = discord.app_commands.Group(name="delete", description="Deletion commands")
   @delete_com.command(
     name="gang",
-    description="Deletes role, roster, and channels for a gang",
+    description="Deletes role, roster, and channels for a gang"
   )
   async def delete_gang(interaction: discord.Interaction, gang: str) -> None:
     """Deletes everything associated with a gang, primarily:
@@ -103,7 +105,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       role = sheets.get_role(guild, gang)
 
       if not db.can_execute(interaction.user, 5, role): # type: ignore
-        await interaction.followup.send("You do not have permission to use this command", ephemeral=True)
+        await interaction.followup.send(embed=permission_embed, ephemeral=True)
         return
 
       if role.name not in db.sheetnames:
@@ -122,12 +124,13 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       db.delete_sheet(role.name, role)
 
       # Delete primary role
+      name = role.name
       await role.delete()
 
-      await interaction.followup.send("Gang deleted successfully", ephemeral=True)
+      await interaction.followup.send(embed=discord.Embed(title="Gang Deleted", description=f"{name} was deleted successfully!", color=discord.Colour.dark_green()), ephemeral=True)
 
     except Exception as e:
-      await interaction.followup.send("Command failed", ephemeral=True)
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
       raise e
 
   @delete_gang.autocomplete("gang")
@@ -136,32 +139,32 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
 
   @delete_com.command (
     name="data",
-    description="Delete Gang Bot's entire database",
+    description="Delete Gang Bot's entire database"
   )
   async def delete_data(interaction: discord.Interaction) -> None:
     try:
       log.info("Command Received: /data delete")
 
       if not db.can_execute(interaction.user, 5, None): # type: ignore
-        await interaction.response.send_message("You do not have permission to use this command", ephemeral=True)
+        await interaction.response.send_message(embed=permission_embed, ephemeral=True)
         return
 
       await interaction.response.defer(ephemeral=True)
 
       async def confirm_callback(interaction: discord.Interaction):
         db.reset_data()
-        embed = discord.Embed(title="Data Deleted", description=db.bot_df.to_string())
+        embed = discord.Embed(title="Data Deleted", description=db.bot_df.to_string(), color=discord.Colour.dark_green())
         await interaction.response.edit_message(embed=embed, view=discord.ui.View())
 
       async def cancel_callback(interaction: discord.Interaction):
-        embed = discord.Embed(title="Cancelled", color=discord.Colour(16711680))
+        embed = discord.Embed(title="Cancelled", color=discord.Colour.dark_green())
         await interaction.response.edit_message(embed=embed, view=discord.ui.View())
 
-      embed = discord.Embed(title="Confirm Deletion", description="**Are you sure you want to delete all data?**", color=discord.Colour(16711680))
+      embed = discord.Embed(title="Confirm Deletion", description="**Are you sure you want to delete all data?**", color=discord.Colour.red())
       embed.add_field(name="This is a destructive action and cannot be reversed!", value="", inline=False)
 
       confirm = discord.ui.Button(style=discord.ButtonStyle.red, label="Delete")
-      confirm.callback = confirm_callback # type: ignore - not sure why I need this
+      confirm.callback = confirm_callback
       cancel = discord.ui.Button(style=discord.ButtonStyle.grey, label="Cancel")
       cancel.callback = cancel_callback
 
@@ -171,11 +174,86 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     except Exception as e:
-      await interaction.followup.send("Command failed", ephemeral=True)
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
       raise e
   tree.add_command(delete_com, guild=guild)
 
-class CreateGangForm(discord.ui.Modal, title="Create Gang"):
+  refresh_com = discord.app_commands.Group(name="refresh", description="Refresh commands")
+  @refresh_com.command(
+    name="roster",
+    description="Refresh a gang's roster from the database"
+  )
+  async def refresh_roster(interaction: discord.Interaction, gang: str) -> None:
+    """Refreshses a gang's roster
+
+    Parameters
+    -----------
+    gang_role: Role
+        the role of the gang to refresh
+    """
+    try:
+      log.info("Command Received: /refresh roster")
+      await interaction.response.defer(ephemeral=True)
+
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
+
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+      await db.refresh_roster(role)
+
+    except Exception as e:
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
+      raise e
+
+  @refresh_roster.autocomplete("gang")
+  async def refresh_roster_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices(interaction.guild)
+  tree.add_command(refresh_com, guild=guild)
+
+  change_com = discord.app_commands.Group(name="change", description="Change commands")
+  @change_com.command(
+    name="color",
+    description="Change the color of a gang"
+  )
+  async def change_color(interaction: discord.Interaction, gang: str) -> None:
+    """Changes the color of a gang's primary role
+
+    Parameters
+    -----------
+    gang_role: Role
+        the role of the gang to change
+    """
+    try:
+      log.info("Command Received: /change color")
+      await interaction.response.defer(ephemeral=True)
+
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
+
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+
+      if not db.can_execute(interaction.user, 4, role): # type: ignore
+        await interaction.followup.send(embed=permission_embed, ephemeral=True)
+        return
+
+      res = await color_embed(role, color=role.color)
+      await interaction.followup.send(embed=res[0], view=res[1])
+    except Exception as e:
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
+      raise e
+
+  @change_color.autocomplete("gang")
+  async def change_color_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices(interaction.guild)
+  tree.add_command(change_com, guild=guild)
+
+class CreateGangForm(discord.ui.Modal):
   def __init__(self, db: sheets.Database):
     self.db = db
     super().__init__(title="Create Gang")
@@ -253,6 +331,82 @@ class CreateGangForm(discord.ui.Modal, title="Create Gang"):
     channels = await utility.create_gang_channels(guild, newRole, subroles, newCategory)
     roster = channels[0]
     radio = channels[1]
-    dataframe = self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
+    self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
     await sheets.update_roster(roster, self.db.get_gang_df(gang_name))
-    await interaction.followup.send(f"```{dataframe}```\n{newRole.mention} - {roster.mention}", ephemeral=True)
+    res = await color_embed(newRole, roster)
+    await interaction.followup.send(embed=res[0], view=res[1])
+
+async def color_embed(gang: discord.Role, roster: discord.TextChannel | None = None, color: discord.Colour = discord.Colour.lighter_grey()) -> tuple[discord.Embed, discord.ui.View]:
+    description = f"< This is the current gang color ({'#%02x%02x%02x' % color.to_rgb()}). Is this correct?"
+    embed = discord.Embed(title=f"Pick a color for {gang.name}", description=description, color=color)
+    embed.add_field(name=f"You can change this later with `/change color {gang.name}`", value="", inline=False)
+
+    async def confirm_color(interaction: discord.Interaction) -> None:
+      await gang.edit(color = color)
+      if roster:
+        com_type = "Created"
+      else:
+        com_type = "Configured"
+      description = gang.mention + f" was {com_type.lower()} successfully"
+      if roster:
+        description += '\n' + roster.mention
+      await interaction.response.edit_message(embed=discord.Embed(title=f"Gang {com_type}", description=description, color=color), view=discord.ui.View())
+
+    async def change_color(interaction: discord.Interaction) -> None:
+      await interaction.response.send_modal(ChooseColorModal(gang, roster, color))
+
+    confirm = discord.ui.Button(style=discord.ButtonStyle.green, label="Confirm Color")
+    confirm.callback = confirm_color
+    change = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Change Color")
+    change.callback = change_color
+
+    view = discord.ui.View()
+    view.add_item(confirm)
+    view.add_item(change)
+
+    return embed, view
+
+class ChooseColorModal(discord.ui.Modal):
+  def __init__(self, gang: discord.Role, roster: discord.TextChannel | None, color: discord.Colour = discord.Colour.greyple()):
+    self.gang: discord.Role = gang
+    self.color: discord.Colour = color
+    self.roster: discord.TextChannel | None = roster
+    super().__init__(title=f"Set Color for {gang.name}")
+
+  hex = discord.ui.TextInput(
+    label="Enter your color hex",
+    placeholder="#123abc",
+    max_length = 7,
+    min_length = 6,
+    required=True,
+    row = 0
+  )
+
+  async def on_submit(self, interaction: discord.Interaction) -> None:
+    flag = False
+
+    regex = re.search(pattern="#?[a-fA-F0-9]{6}", string=str(self.hex))
+    if not regex:
+      flag = True
+    else:
+      hex = str(self.hex) if str(self.hex)[0] != '#' else str(self.hex)[1:]
+      col_int = int(hex, 16)
+      if col_int < 0 or  col_int > 16777215:
+        flag = True
+
+    if flag:
+      res = await color_embed(self.gang)
+      await interaction.response.edit_message(embed=discord.Embed(title="Improperly Formatted Color", description="The value you entered is not a valid hex color, please try again", color=self.gang.color), view=res[1])
+      return
+
+    color = discord.Colour(col_int)
+    res = await color_embed(self.gang, self.roster, color)
+    await interaction.response.edit_message(embed=res[0], view=res[1])
+
+
+
+
+class ChangeSubrolesName(discord.ui.Modal):
+  temp = 1
+
+

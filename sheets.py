@@ -1,4 +1,5 @@
 import os
+from discord import TextChannel
 from dotenv import load_dotenv
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
@@ -381,6 +382,32 @@ class Database:
     log.info(f"Deleting {len(self.worksheets)} worksheets...")
     self.spreadsheet.batch_update({"requests": reqs})
     self.__init__(self.SPREADSHEET_ID)
+
+  async def refresh_roster(self, role: discord.Role) -> None:
+    log.info(f"Refreshing @{role.name} roster...")
+
+    worksheet = self.worksheets[self.get_worksheet_index(role.name)]
+    crids: dict[str, int] = get_df_at(self.bot_df, role.id, "RID", "CRIDs", read_dict=True)
+
+    dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
+    for member in role.members:
+      power = self.get_power(member, crids, skipAdmin=True)
+      if power < 1:
+        raise Exception(f"User doesn't have a subrole")
+      subrole = get_role(member.guild, list(crids.keys())[list(crids.values()).index(power)])
+
+      mid = member.id
+      name = member.name if not member.nick else member.nick
+      rank = subrole.name.split('-')[1].strip()
+      rid = str(subrole.id)
+      iban = get_df_at(self.get_gang_df(role.name), member.id, "ID", "IBAN")
+      dataframe.loc[len(dataframe.index)] = [mid, name, rank, rid, iban]
+
+    set_with_dataframe(worksheet, dataframe, resize=True)
+
+    rocid = get_df_at(self.bot_df, role.id, "RID", "RoCID")
+    channel: TextChannel = role.guild.get_channel(rocid) # type: ignore
+    await update_roster(channel, dataframe)
 
   def can_execute(self,
                   caller: discord.Member,

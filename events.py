@@ -56,7 +56,7 @@ def get_events(client: Client, db: sheets.Database) -> None:
           if db.get_power(caller, crids) <= db.get_power(member, crids):
             canExecute = False
         else:
-          canExecute = db.can_execute(caller, gang_role, 3, isEvent=True) # type: ignore
+          canExecute = db.can_execute(caller, 3, gang_role, isEvent=True) # type: ignore
           crids = db.get_crids(gang_role) # type: ignore
           if db.get_power(caller, crids) <= db.get_power(member, crids, opt_role=changed_role):
             canExecute = False
