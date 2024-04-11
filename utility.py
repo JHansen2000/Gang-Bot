@@ -12,7 +12,7 @@ def get_rid_by_name(member: Member, name: str) -> int:
   return [role.id for role in member.roles if role.name == name][0]
 
 def get_category(guild: Guild, cid: str) -> CategoryChannel:
-  category = [cat for cat in guild.categories if str(cat.id == cid)][0]
+  category = [cat for cat in guild.categories if str(cat.id) == cid][0]
   if not category:
     raise Exception("Couldn't get category")
   return category

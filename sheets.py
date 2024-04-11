@@ -120,11 +120,11 @@ class Database:
     log.info(f"@{member.name} has power {power}")
     return power
 
-  def get_gang_choices(self) -> list[discord.app_commands.Choice[str]]:
+  def get_gang_choices(self, guild) -> list[discord.app_commands.Choice[str]]:
     if len(self.sheetnames) < 1:
       role_choices=[discord.app_commands.Choice(name="No gangs exist", value="")]
     else:
-      role_choices=[discord.app_commands.Choice(name=gang_name, value=self.get_rid(gang_name)) for gang_name in self.sheetnames]
+      role_choices=[discord.app_commands.Choice(name=gang.name, value=str(gang.id)) for gang in self.get_all_gangs(guild)]
     return role_choices
 
   def get_gang_df(self, gang_name: str | int) -> pd.DataFrame:

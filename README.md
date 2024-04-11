@@ -8,7 +8,6 @@
 
 ## Current Task:
 - Color selection embed before final result (EMBED COLOR SHOULD CHANGE WITH INPUT)
-- Fix deletion targeting wrong category !!!
 - Create command to change subrole titles
 - Create command to update radio channel
 

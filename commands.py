@@ -132,7 +132,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
 
   @delete_gang.autocomplete("gang")
   async def delete_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
-    return db.get_gang_choices()
+    return db.get_gang_choices(interaction.guild)
 
   @delete_com.command (
     name="data",
