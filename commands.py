@@ -2,7 +2,6 @@ import discord
 import string
 import utility
 import sheets
-import pandas as pd
 from logger import Logger
 log = Logger()
 

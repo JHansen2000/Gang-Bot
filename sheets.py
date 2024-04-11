@@ -1,11 +1,9 @@
-from lib2to3.fixes.fix_has_key import FixHasKey
-from optparse import Values
 import os
 from dotenv import load_dotenv
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
 from gspread_dataframe import set_with_dataframe
-from utility import get_rid_by_name, get_role
+from utility import get_role
 from table2ascii import Alignment, table2ascii as t2a, PresetStyle
 import pandas as pd
 from datetime import date

@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from discord import Intents, Client, Object, app_commands
 from commands import get_commands
-from sheets import Database, connect_to_db
+from sheets import Database
 from events import get_events
 from logger import Logger
 log = Logger()

@@ -1,5 +1,4 @@
-from discord import AuditLogAction, AuditLogEntry, Client, Role, TextChannel
-from archive.sheets import can_execute
+from discord import AuditLogAction, AuditLogEntry, Client, Role
 import sheets
 import logger
 log = logger.Logger()
