@@ -1,7 +1,6 @@
 import os
 import re
-from typing import Coroutine
-from discord import TextChannel, TextInput
+from discord import TextChannel
 from dotenv import load_dotenv
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
@@ -623,7 +622,7 @@ class ChangeRadioModal(discord.ui.Modal):
     row = 0
   )
 
-  async def on_submit(self, interaction: discord.Interaction) -> discord.Embed | None:
+  async def on_submit(self, interaction: discord.Interaction) -> None:
     if str(self.primary).replace('.','',1).isdigit() and str(self.secondary).replace('.','',1).isdigit() and str(self.tertiary).replace('.','',1).isdigit():
       embed = discord.Embed(
         title=f"Radio Channels - {self.role.name}",
@@ -638,9 +637,9 @@ class ChangeRadioModal(discord.ui.Modal):
       channel: TextChannel = self.role.guild.get_channel(int(racid)) # type: ignore
       if not channel: raise Exception("Could not find radio channel")
       await self.db.update_radio_message(channel, self.role, embed)
+
       if self.buttonPressed:
         await interaction.response.defer(thinking=False)
-        return embed
       else:
         await interaction.response.send_message(embed=discord.Embed(title="Radio Updated", color=discord.Colour.dark_green()), ephemeral=True)
 
