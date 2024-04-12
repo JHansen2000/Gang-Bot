@@ -43,7 +43,7 @@ get_events(client, global_db)
 @client.event
 async def on_ready() -> None:
     try:
-        guild = await client.fetch_guild(int(GUILD_ID))
+        guild = await client.get_guild(int(GUILD_ID))
         synced = await tree.sync(guild=guild)
         log.info(f"Synced {len(synced)} command(s)...")
         log.info(f"{client.user} is now running")
