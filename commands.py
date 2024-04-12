@@ -6,13 +6,13 @@ import re
 from logger import Logger
 log = Logger()
 
+dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour.red())
+fail_embed = discord.Embed(title="Command Failed", description="Something went wrong, ask a Developer for help!", color=discord.Colour.red())
+permission_embed = discord.Embed(title="Insufficient Permissions", description="You do not have permission to run this command!", color=discord.Colour.dark_red())
+
 def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
                  db: sheets.Database,
                  guild: discord.Object | None = None):
-
-  dne_embed = discord.Embed(title="No Gangs Exist", description="**You can create one with** `/gang create`", color=discord.Colour.red())
-  fail_embed = discord.Embed(title="Command Failed", description="Something went wrong, ask a Developer for help!", color=discord.Colour.red())
-  permission_embed = discord.Embed(title="Insufficient Permissions", description="You do not have permission to run this command!", color=discord.Colour.dark_red())
 
   @tree.command (
     name="test",
@@ -245,12 +245,73 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
 
       res = await color_embed(role, color=role.color)
       await interaction.followup.send(embed=res[0], view=res[1])
+
     except Exception as e:
       await interaction.followup.send(embed=fail_embed, ephemeral=True)
       raise e
 
   @change_color.autocomplete("gang")
   async def change_color_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices(interaction.guild)
+
+  @change_com.command(
+    name="iban",
+    description="Change or Set your IBAN"
+  )
+  async def change_iban(interaction: discord.Interaction, gang: str) -> None:
+    try:
+      log.info("Command Received: /change iban")
+
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
+
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+
+      if not interaction.user in role.members: # type: ignore
+        await interaction.response.send_message(embed=permission_embed, ephemeral=True)
+        return
+
+      await interaction.response.send_modal(sheets.ChangeIBANModal(role, db))
+
+    except Exception as e:
+      await interaction.response.send_message(embed=fail_embed, ephemeral=True)
+      raise e
+
+  @change_iban.autocomplete("gang")
+  async def change_iban_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices(interaction.guild)
+
+  @change_com.command(
+    name="subroles",
+    description="Change the names of your gang subroles"
+  )
+  async def change_subroles(interaction: discord.Interaction, gang: str) -> None:
+    try:
+      log.info("Command Received: /change subroles")
+
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
+
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+
+      if not db.can_execute(interaction.user, 4, role): # type: ignore
+        await interaction.followup.send(embed=permission_embed, ephemeral=True)
+        return
+
+      await interaction.response.send_modal(sheets.ChangeSubrolesModal(role, db))
+
+    except Exception as e:
+      await interaction.response.send_message(embed=fail_embed, ephemeral=True)
+      raise e
+
+  @change_subroles.autocomplete("gang")
+  async def change_subroles_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
     return db.get_gang_choices(interaction.guild)
   tree.add_command(change_com, guild=guild)
 
@@ -329,43 +390,86 @@ class CreateGangForm(discord.ui.Modal):
     subroles = [sr for sr in unpruned if sr is not None]
     newCategory = await utility.create_category(guild, newRole)
     await utility.update_gang_category(newCategory, subroles)
+
     channels = await utility.create_gang_channels(guild, newRole, subroles, newCategory)
     roster = channels[0]
     radio = channels[1]
+
     self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
-    await self.db.update_roster(roster, newRole)
     res = await color_embed(newRole, roster)
     await interaction.followup.send(embed=res[0], view=res[1])
 
+    await self.db.update_roster(roster, newRole)
+
+    res = await radio_embed(newRole, self.db, radio)
+    await self.db.update_radio_message(radio, newRole)
+
 async def color_embed(gang: discord.Role, roster: discord.TextChannel | None = None, color: discord.Colour = discord.Colour.lighter_grey()) -> tuple[discord.Embed, discord.ui.View]:
-    description = f"< This is the current gang color ({'#%02x%02x%02x' % color.to_rgb()}). Is this correct?"
-    embed = discord.Embed(title=f"Pick a color for {gang.name}", description=description, color=color)
-    embed.add_field(name=f"You can change this later with `/change color {gang.name}`", value="", inline=False)
+  description = f"< This is the current gang color ({'#%02x%02x%02x' % color.to_rgb()}). Is this correct?"
+  embed = discord.Embed(title=f"Pick a color for {gang.name}", description=description, color=color)
+  embed.add_field(name=f"You can change this later with `/change color {gang.name}`", value="", inline=False)
 
-    async def confirm_color(interaction: discord.Interaction) -> None:
-      await gang.edit(color = color)
-      if roster:
-        com_type = "Created"
-      else:
-        com_type = "Configured"
-      description = gang.mention + f" was {com_type.lower()} successfully"
-      if roster:
-        description += '\n' + roster.mention
-      await interaction.response.edit_message(embed=discord.Embed(title=f"Gang {com_type}", description=description, color=color), view=discord.ui.View())
+  async def confirm_color(interaction: discord.Interaction) -> None:
+    await gang.edit(color = color)
+    if roster:
+      com_type = "Created"
+    else:
+      com_type = "Configured"
+    description = gang.mention + f" was {com_type.lower()} successfully"
+    if roster:
+      description += '\n' + roster.mention
+    await interaction.response.edit_message(embed=discord.Embed(title=f"Gang {com_type}", description=description, color=color), view=discord.ui.View())
 
-    async def change_color(interaction: discord.Interaction) -> None:
-      await interaction.response.send_modal(ChooseColorModal(gang, roster, color))
+  async def change_color(interaction: discord.Interaction) -> None:
+    await interaction.response.send_modal(ChooseColorModal(gang, roster, color))
 
-    confirm = discord.ui.Button(style=discord.ButtonStyle.green, label="Confirm Color")
-    confirm.callback = confirm_color
-    change = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Change Color")
-    change.callback = change_color
+  confirm = discord.ui.Button(style=discord.ButtonStyle.green, label="Confirm Color")
+  confirm.callback = confirm_color
+  change = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Change Color")
+  change.callback = change_color
 
-    view = discord.ui.View()
-    view.add_item(confirm)
-    view.add_item(change)
+  view = discord.ui.View()
+  view.add_item(confirm)
+  view.add_item(change)
 
-    return embed, view
+  return embed, view
+
+async def radio_embed(gang: discord.Role, db: sheets.Database, radio: discord.TextChannel, embed: discord.Embed | None = None) -> tuple[discord.Embed, discord.ui.View]:
+  if not embed:
+    embed = discord.Embed(title=f"Set Up Radio - {gang.name}", description="Set up radio channels now or later?", color=gang.color)
+
+
+    async def set_now(interaction: discord.Interaction) -> None:
+      radio_embed = await interaction.response.send_modal(sheets.ChangeRadioModal(gang, db, True))
+      if not radio_embed:
+        await interaction.response.edit_message(embed=discord.Embed(title="Something Went Wrong", description=f"Could not set radio channels!\nTry again with `/change radio` OR press the button in {radio.mention}"), view=discord.ui.View())
+      
+
+    async def set_later(interaction: discord.Interaction) -> None:
+      newEmbed = discord.Embed(title=f"Radio Channels - {gang.name}", description="Not set!\nSet with `/change radio` OR press the button below!", color=gang.color)
+
+    button_1 = discord.ui.Button(style=discord.ButtonStyle.green, label="Set Now")
+    button_1.callback = set_now
+    button_2 = discord.ui.Button(style=discord.ButtonStyle.gray, label="Later")
+    button_2.callback = set_later
+
+  else:
+    async def confirm_callback(interaction: discord.Interaction) -> None:
+      temp = 1
+
+    async def change_callback(interaction: discord.Interaction) -> None:
+      temp = 1
+
+    button_1 = discord.ui.Button(style=discord.ButtonStyle.green, label="Set Now")
+    button_1.callback = confirm_callback
+    button_2 = discord.ui.Button(style=discord.ButtonStyle.gray, label="Later")
+    button_2.callback = change_callback
+
+  view = discord.ui.View()
+  view.add_item(button_1)
+  view.add_item(button_2)
+
+
 
 class ChooseColorModal(discord.ui.Modal):
   def __init__(self, gang: discord.Role, roster: discord.TextChannel | None, color: discord.Colour = discord.Colour.greyple()):
@@ -403,11 +507,5 @@ class ChooseColorModal(discord.ui.Modal):
     color = discord.Colour(col_int)
     res = await color_embed(self.gang, self.roster, color)
     await interaction.response.edit_message(embed=res[0], view=res[1])
-
-
-
-
-class ChangeSubrolesName(discord.ui.Modal):
-  temp = 1
 
 

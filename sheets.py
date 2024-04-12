@@ -1,5 +1,7 @@
 import os
-from discord import TextChannel
+import re
+from typing import Coroutine
+from discord import TextChannel, TextInput
 from dotenv import load_dotenv
 import discord
 from gspread import Spreadsheet, Worksheet, service_account
@@ -17,6 +19,10 @@ GANG_DATA_HEADERS = ["ID", "Name", "Rank", "RID", "IBAN"]
 load_dotenv()
 ADMIN_ID = os.getenv("ADMIN_ID")
 if not ADMIN_ID: raise Exception("Unable to get ADMIN_ID")
+BOT_ID = os.getenv("BOT_ID")
+if not BOT_ID: raise Exception("Unable to get BOT_ID")
+
+permission_embed = discord.Embed(title="Insufficient Permissions", description="You do not have permission to run this command!", color=discord.Colour.dark_red())
 
 def connect_to_db(SPREADSHEET_ID: str) -> Spreadsheet:
   log.info(f"Connecting to database - {SPREADSHEET_ID}")
@@ -73,35 +79,14 @@ class Database:
     self.sheetnames.pop(bot_index)
     self.sheetids.pop(bot_index)
 
-    # self.print_vars()
     log.info("Database initialized")
 
   async def init_gang_rosters(self, guild: discord.Guild):
-    all_RIDs = self.get_all_RIDs()
-    all_roles = await guild.fetch_roles()
-    for rid in all_RIDs:
-      found = guild.get_role(int(rid))
-      if found:
-        print(found.name, found.members)
-      print([(role.name, role.members) for role in all_roles if str(role.id) == rid])
-    # all_roles = await guild.fetch_roles()
-    # all_gangs = [role for role in all_roles if str(role.id) in all_RIDs]
-    # for gang in all_gangs:
-    #   channel_id = int(get_df_at(self.bot_df, gang.id, "RID", "RoCID"))
-    #   roster = await guild.fetch_channel(channel_id)
-    #   if not roster: raise Exception(f"Could not get channel with ID {channel_id}")
-    #   await self.refresh_roster(gang)
-
-  def print_vars(self) -> None:
-    print('\n')
-    print(self.SPREADSHEET_ID)
-    print(self.spreadsheet)
-    print(self.worksheets)
-    print(self.sheetnames)
-    print(self.sheetids)
-    print(self.bot_sheet)
-    print(self.bot_df)
-    print('\n')
+    for gang in self.get_all_gangs(guild):
+      channel_id = int(get_df_at(self.bot_df, gang.id, "RID", "RoCID"))
+      roster = guild.get_channel(channel_id)
+      if not roster: raise Exception(f"Could not get channel with ID {channel_id}")
+      await self.refresh_roster(gang)
 
   def get_power(self,
                 member: discord.Member,
@@ -228,6 +213,26 @@ class Database:
       newMap[str(newRole.id)] = power
     return newMap
 
+  def create_sheet(self, worksheetName: str) -> Worksheet:
+    if worksheetName in self.sheetnames:
+      raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
+
+    log.info(f"Creating worksheet '{worksheetName}'...")
+    newSheet = self.spreadsheet.add_worksheet(
+      title=worksheetName,
+      rows=2,
+      cols=len(GANG_DATA_HEADERS),
+      index=len(self.sheetnames))
+    log.info(f"Created worksheet '{worksheetName}'")
+    dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
+    set_with_dataframe(newSheet, dataframe, resize=True)
+
+    self.worksheets.append(newSheet)
+    self.sheetnames.append(newSheet.title)
+    self.sheetids.append(newSheet.id)
+    self.spreadsheet.fetch_sheet_metadata()
+    return newSheet
+
   def update_bot(self,
                  role: discord.Role,
                  gang_map: dict[str, int] | None = None,
@@ -318,7 +323,6 @@ class Database:
     if len(row) < 1:
       log.info(f"Member {name} is new to '{gang_name}'")
       row = len(dataframe)
-
       iban = "None"
     else:
       iban = get_df_at(dataframe, member.id, "ID", "IBAN")
@@ -334,8 +338,9 @@ class Database:
     log.info("Update successful")
     return dataframe
 
-  async def update_roster(self, channel: discord.TextChannel, role: discord.Role) -> None:
-    df = self.get_gang_df(role.name)
+  async def update_roster(self, channel: discord.TextChannel, role: discord.Role, df: pd.DataFrame | None = None) -> None:
+    if df is None:
+      df = self.get_gang_df(role.name)
     printable = df[["Name", "Rank", "IBAN"]]
 
     output = t2a(
@@ -345,43 +350,64 @@ class Database:
       alignments = [Alignment.LEFT, Alignment.LEFT, Alignment.RIGHT],
       first_col_heading = True
       )
+    worksheet = self.worksheets[self.get_worksheet_index(role.name)]
+    set_with_dataframe(worksheet, df)
+    await self.update_roster_message(channel, output, role)
+
+  async def update_roster_message(self, channel: discord.TextChannel, content: str, role: discord.Role) -> None:
+    view = discord.ui.View()
 
     async def refresh_callback(interaction: discord.Interaction) -> None:
       await self.refresh_roster(role)
       await interaction.response.edit_message(view=view)
-
-    refresh = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Refresh")
+    refresh = discord.ui.Button(style=discord.ButtonStyle.success, label="Refresh")
     refresh.callback = refresh_callback
-    view = discord.ui.View()
     view.add_item(refresh)
 
-    last = channel.last_message
-    if last:
-        await last.edit(content=f"```{output}```", view=view)
+    async def subroles_callback(interaction: discord.Interaction) -> None:
+      member = interaction.user
+      if not self.can_execute(member, 4, role): # type: ignore
+        await interaction.response.send_message(embed=permission_embed, ephemeral=True)
+        return
+      await interaction.response.send_modal(ChangeSubrolesModal(role, self, buttonPressed=True))
+    subroles = discord.ui.Button(style=discord.ButtonStyle.secondary, label="Change Subroles")
+    subroles.callback = subroles_callback
+    view.add_item(subroles)
+
+    async def iban_callback(interaction:discord.Interaction) -> None:
+      await interaction.response.send_modal(ChangeIBANModal(role, self, buttonPressed=True))
+    iban = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Set IBAN")
+    iban.callback = iban_callback
+    view.add_item(iban)
+
+    last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
+    if last and last.author.id == int(BOT_ID):
+        await last.edit(content=f"{role.mention}\n```{content}```", view=view)
     else:
-        log.info(f"Could not find roster message for @{role.name} - purging...")
+        log.info(f"Roster message not found - creating...")
         await channel.purge()
-        await channel.send(f"```{output}```", view=view, silent=True)
+        await channel.send(f"{role.mention}\n```{content}```", view=view, silent=True)
 
-  def create_sheet(self, worksheetName: str) -> Worksheet:
-    if worksheetName in self.sheetnames:
-        raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
+  async def update_radio_message(self, channel: discord.TextChannel, role: discord.Role, embed: discord.Embed) -> None:
+    view = discord.ui.View()
 
-    log.info(f"Creating worksheet '{worksheetName}'...")
-    newSheet = self.spreadsheet.add_worksheet(
-        title=worksheetName,
-        rows=2,
-        cols=len(GANG_DATA_HEADERS),
-        index=len(self.sheetnames))
-    log.info(f"Created worksheet '{worksheetName}'")
-    dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
-    set_with_dataframe(newSheet, dataframe, resize=True)
+    async def radio_callback(interaction: discord.Interaction) -> None:
+      member = interaction.user
+      if not self.can_execute(member, 3, role): # type: ignore
+        await interaction.response.send_message(embed=permission_embed, ephemeral=True)
+        return
+      await interaction.response.send_modal(ChangeRadioModal(role, self, True))
+    radio = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Change Radio")
+    radio.callback = radio_callback
+    view.add_item(radio)
 
-    self.worksheets.append(newSheet)
-    self.sheetnames.append(newSheet.title)
-    self.sheetids.append(newSheet.id)
-    self.spreadsheet.fetch_sheet_metadata()
-    return newSheet
+    last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
+    if last and last.author.id == int(BOT_ID):
+        await last.edit(embed=embed, view=view)
+    else:
+        log.info(f"Radio message not found - creating...")
+        await channel.purge()
+        await channel.send(embed=embed, view=view, silent=True)
 
   def delete_sheet(self, sheetname: str, role: discord.Role | None = None) -> None:
     if role:
@@ -422,10 +448,7 @@ class Database:
     crids: dict[str, int] = get_df_at(self.bot_df, role.id, "RID", "CRIDs", read_dict=True)
 
     dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
-    print(role.members)
-    print(len(role.members))
     for member in role.members:
-      print(member.name)
       power = self.get_power(member, crids, skipAdmin=True)
       if power < 1:
         raise Exception(f"User doesn't have a subrole")
@@ -435,16 +458,30 @@ class Database:
       name = member.name if not member.nick else member.nick
       rank = subrole.name.split('-')[1].strip()
       rid = str(subrole.id)
-      iban = get_df_at(self.get_gang_df(role.name), member.id, "ID", "IBAN")
+
+      try:
+        iban = get_df_at(self.get_gang_df(role.name), member.id, "ID", "IBAN")
+      except Exception:
+        log.error(f"Could not get IBAN for {member.id} - setting to None")
+        iban = "None"
+
       dataframe.loc[len(dataframe)] = [mid, name, rank, rid, iban]
-    print(dataframe.to_string())
     set_with_dataframe(worksheet, dataframe, resize=True)
 
     rocid = get_df_at(self.bot_df, role.id, "RID", "RoCID")
-    channel: TextChannel | None = await role.guild.fetch_channel(int(rocid)) # type: ignore
+    channel: TextChannel = role.guild.get_channel(int(rocid)) # type: ignore
     if not channel: raise Exception("Could not find roster channel")
-    await self.update_roster(channel, role)
-    log.info("Returned")
+    await self.update_roster(channel, role, dataframe)
+
+  async def assign_iban(self, role: discord.Role, member: discord.Member | discord.User, iban: str) -> None:
+    dataframe = self.get_gang_df(role.name)
+    dataframe.loc[dataframe["ID"] == str(member.id), "IBAN"] = iban
+
+    rocid = get_df_at(self.bot_df, role.id, "RID", "RoCID")
+    channel: TextChannel = role.guild.get_channel(int(rocid)) # type: ignore
+    if not channel: raise Exception("Could not find roster channel")
+
+    await self.update_roster(channel, role, dataframe)
 
   def can_execute(self,
                   caller: discord.Member,
@@ -461,3 +498,152 @@ class Database:
             return False
         return True if self.get_power(caller, self.get_crids(gang_role)) >= requirement else False
     return True if self.get_power(caller, self.get_crids(role)) >= requirement else False
+
+class ChangeIBANModal(discord.ui.Modal):
+  def __init__(self, gang: discord.Role, db: Database, buttonPressed: bool = False) -> None:
+    self.gang = gang
+    self.db = db
+    self.buttonPressed = buttonPressed
+    super().__init__(title="Enter IBAN")
+
+  iban = discord.ui.TextInput(
+    label="You can find yours at any bank location!",
+    placeholder="OK123123",
+    max_length = 8,
+    min_length = 8,
+    required=True,
+    row = 0
+  )
+
+  async def on_submit(self, interaction: discord.Interaction) -> None:
+    regex = re.search(pattern="OK[0-9]{6}", string=str(self.iban).upper())
+    if not regex:
+      await interaction.response.send_message(embed=discord.Embed(title="Improperly Formatted IBAN", description="The value you entered is not a valid IBAN", color=self.gang.color), ephemeral=True)
+      return
+    await self.db.assign_iban(self.gang, interaction.user, str(self.iban).upper())
+    if self.buttonPressed:
+      await interaction.response.defer(thinking=False)
+    else:
+      await interaction.response.send_message(embed=discord.Embed(title="IBAN Changed", color=discord.Colour.dark_green()), ephemeral=True)
+
+class ChangeSubrolesModal(discord.ui.Modal):
+  def __init__(self, gang: discord.Role, db: Database, buttonPressed: bool = False) -> None:
+    self.gang = gang
+    self.db = db
+    self.buttonPressed = buttonPressed
+    super().__init__(title="Change Subroles Names")
+
+  gl_name = discord.ui.TextInput(
+    label="What do you call your Gang Leader?",
+    placeholder="Gang Leader",
+    custom_id="gl_name",
+    default="Gang Leader",
+    style=discord.TextStyle.short,
+    max_length=16,
+    row=1
+  )
+  hc_name = discord.ui.TextInput(
+    label="What do you call your High Command?",
+    placeholder="High Command",
+    custom_id="hc_name",
+    default="High Command",
+    style=discord.TextStyle.short,
+    max_length=16,
+    row=2
+  )
+  m_name = discord.ui.TextInput(
+    label="What do you call a Member?",
+    placeholder="Member",
+    custom_id="m_name",
+    default="Member",
+    style=discord.TextStyle.short,
+    max_length=16,
+    row=3
+  )
+  ha_name = discord.ui.TextInput(
+    label="What do you call a Hangaround?",
+    placeholder="Hangaround",
+    custom_id="ha_name",
+    default="Hangaround",
+    style=discord.TextStyle.short,
+    max_length=16,
+    row=4
+  )
+
+  async def on_submit(self, interaction: discord.Interaction) -> None:
+    guild = interaction.guild
+    if not guild: raise Exception("Failed to get guild")
+
+    subroles = self.db.get_subroles(self.gang, guild)
+    pre = f"{self.gang.name} -"
+    await subroles[0].edit(name=f"{pre} {self.gl_name}")
+    await subroles[1].edit(name=f"{pre} {self.hc_name}")
+    await subroles[2].edit(name=f"{pre} {self.m_name}")
+    await subroles[3].edit(name=f"{pre} {self.ha_name}")
+
+    await self.db.refresh_roster(self.gang)
+    if self.buttonPressed:
+      await interaction.response.defer(thinking=False)
+    else:
+      await interaction.response.send_message(embed=discord.Embed(title="Subroles Changed", color=discord.Colour.dark_green()), ephemeral=True)
+
+class ChangeRadioModal(discord.ui.Modal):
+  def __init__(self, role: discord.Role, db: Database, buttonPressed: bool = False):
+    self.role = role
+    self.db = db
+    self.buttonPressed = buttonPressed
+    super().__init__(title="Set Radio Channels")
+
+  primary=discord.ui.TextInput(
+    label="What is your primary radio channel?",
+    style=discord.TextStyle.short,
+    placeholder="11.11",
+    required=True,
+    row = 0
+  )
+  secondary = discord.ui.TextInput(
+    label="What is your secondary radio channel?",
+    style=discord.TextStyle.short,
+    placeholder="22.22",
+    required=True,
+    row = 0
+  )
+  tertiary = discord.ui.TextInput(
+    label="What is your tertiary radio channel?",
+    style=discord.TextStyle.short,
+    placeholder="33.33",
+    required=True,
+    row = 0
+  )
+  notes = discord.ui.TextInput(
+    label="Do you have any notes/instructions for radio channel usage?",
+    style=discord.TextStyle.long,
+    placeholder="Notes...",
+    required=False,
+    row = 0
+  )
+
+  async def on_submit(self, interaction: discord.Interaction) -> discord.Embed | None:
+    if str(self.primary).replace('.','',1).isdigit() and str(self.secondary).replace('.','',1).isdigit() and str(self.tertiary).replace('.','',1).isdigit():
+      embed = discord.Embed(
+        title=f"Radio Channels - {self.role.name}",
+        description="*These are **private** radio channels, please do not share*", color=self.role.color)
+      embed.add_field(name="Primary:", value=str(self.primary), inline=False)
+      embed.add_field(name="Secondary:", value=str(self.secondary), inline=False)
+      embed.add_field(name="Tertiary:", value=str(self.tertiary), inline=False)
+      if self.notes:
+        embed.add_field(name="Notes:", value=str(self.notes), inline=False)
+
+      racid = get_df_at(self.db.bot_df, self.role.id, "RID", "RaCID")
+      channel: TextChannel = self.role.guild.get_channel(int(racid)) # type: ignore
+      if not channel: raise Exception("Could not find radio channel")
+      await self.db.update_radio_message(channel, self.role, embed)
+      if self.buttonPressed:
+        await interaction.response.defer(thinking=False)
+        return embed
+      else:
+        await interaction.response.send_message(embed=discord.Embed(title="Radio Updated", color=discord.Colour.dark_green()), ephemeral=True)
+
+    else:
+      # Error here
+      temp = 1

@@ -7,15 +7,13 @@
 - `python3 main.py`
 
 ## Current Task:
-- Create command to change subrole titles
 - Create command to update radio channel
-- Create IBAN command (roster button modal)
 
 ## TODO
 - Log changes in #audit-log channel
 - Create event handler on member leave
 - Create event handler on member join
 - Create command to create joint categories
+- Send help messages on gang create
   - **STRETCH** Delete joint categories if one gang is deleted
 - **STRETCH** Create custom tags (non-functional)
-- **STRETCH** Create refresh button on gang sheets
