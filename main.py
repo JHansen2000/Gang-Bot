@@ -47,6 +47,7 @@ async def on_ready() -> None:
         synced = await tree.sync(guild=guild)
         log.info(f"Synced {len(synced)} command(s)...")
         log.info(f"{client.user} is now running")
+        await global_db.init_gang_rosters(guild)
     except Exception as e:
         log.fatal(f"Failed to start\n\n{e}\n\n")
 

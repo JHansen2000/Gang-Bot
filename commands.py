@@ -203,6 +203,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       if not guild: raise Exception("Could not get guild")
       role = sheets.get_role(guild, gang)
       await db.refresh_roster(role)
+      await interaction.followup.send(embed=discord.Embed(title=f"{role.name} Roster Refreshed", color=discord.Colour.green()))
 
     except Exception as e:
       await interaction.followup.send(embed=fail_embed, ephemeral=True)
@@ -332,7 +333,7 @@ class CreateGangForm(discord.ui.Modal):
     roster = channels[0]
     radio = channels[1]
     self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
-    await sheets.update_roster(roster, self.db.get_gang_df(gang_name))
+    await self.db.update_roster(roster, newRole)
     res = await color_embed(newRole, roster)
     await interaction.followup.send(embed=res[0], view=res[1])
 

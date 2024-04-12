@@ -106,8 +106,8 @@ def get_events(client: Client, db: sheets.Database) -> None:
         if gangModified:
           db.update_gang(gang_role.name, member, delete)
           channel_id = sheets.get_df_at(db.bot_df, gang_role.id, "RID", "RoCID")
-          roster = guild.get_channel(int(channel_id))
-          await sheets.update_roster(roster, db.get_gang_df(gang_role.name)) # type: ignore
+          roster = await guild.fetch_channel(int(channel_id))
+          await db.update_roster(roster, gang_role) # type: ignore
 
         return
 
@@ -122,7 +122,7 @@ def get_events(client: Client, db: sheets.Database) -> None:
           db.update_gang(gang.name, member, False)
           channel_id = sheets.get_df_at(db.bot_df, gang.id, "RID", "RoCID")
           roster = guild.get_channel(int(channel_id))
-          await sheets.update_roster(roster, db.get_gang_df(gang.name)) # type: ignore
+          await db.update_roster(roster, gang) # type: ignore
         log.info("Member nickname updated")
 
     else:

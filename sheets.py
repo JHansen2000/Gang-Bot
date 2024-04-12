@@ -58,19 +58,6 @@ def get_df_at(input: pd.DataFrame,
 def get_df_row(input: pd.DataFrame, id: int, key: str) -> list[str]:
   return input.index[input[key] == str(id)].tolist()
 
-async def update_roster(channel: discord.TextChannel, df: pd.DataFrame) -> None:
-  printable = df[["Name", "Rank", "IBAN"]]
-
-  output = t2a(
-    header = printable.columns.tolist(),
-    body = printable.values.tolist(),
-    style = PresetStyle.thin_compact,
-    alignments = [Alignment.LEFT, Alignment.LEFT, Alignment.RIGHT],
-    first_col_heading = True
-    )
-  await channel.purge()
-  await channel.send(f"```{output}```", silent=True)
-
 class Database:
   def __init__(self, SPREADSHEET_ID: str):
     self.SPREADSHEET_ID = SPREADSHEET_ID
@@ -88,6 +75,22 @@ class Database:
 
     # self.print_vars()
     log.info("Database initialized")
+
+  async def init_gang_rosters(self, guild: discord.Guild):
+    all_RIDs = self.get_all_RIDs()
+    all_roles = await guild.fetch_roles()
+    for rid in all_RIDs:
+      found = guild.get_role(int(rid))
+      if found:
+        print(found.name, found.members)
+      print([(role.name, role.members) for role in all_roles if str(role.id) == rid])
+    # all_roles = await guild.fetch_roles()
+    # all_gangs = [role for role in all_roles if str(role.id) in all_RIDs]
+    # for gang in all_gangs:
+    #   channel_id = int(get_df_at(self.bot_df, gang.id, "RID", "RoCID"))
+    #   roster = await guild.fetch_channel(channel_id)
+    #   if not roster: raise Exception(f"Could not get channel with ID {channel_id}")
+    #   await self.refresh_roster(gang)
 
   def print_vars(self) -> None:
     print('\n')
@@ -331,6 +334,35 @@ class Database:
     log.info("Update successful")
     return dataframe
 
+  async def update_roster(self, channel: discord.TextChannel, role: discord.Role) -> None:
+    df = self.get_gang_df(role.name)
+    printable = df[["Name", "Rank", "IBAN"]]
+
+    output = t2a(
+      header = printable.columns.tolist(),
+      body = printable.values.tolist(),
+      style = PresetStyle.thin_compact,
+      alignments = [Alignment.LEFT, Alignment.LEFT, Alignment.RIGHT],
+      first_col_heading = True
+      )
+
+    async def refresh_callback(interaction: discord.Interaction) -> None:
+      await self.refresh_roster(role)
+      await interaction.response.edit_message(view=view)
+
+    refresh = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Refresh")
+    refresh.callback = refresh_callback
+    view = discord.ui.View()
+    view.add_item(refresh)
+
+    last = channel.last_message
+    if last:
+        await last.edit(content=f"```{output}```", view=view)
+    else:
+        log.info(f"Could not find roster message for @{role.name} - purging...")
+        await channel.purge()
+        await channel.send(f"```{output}```", view=view, silent=True)
+
   def create_sheet(self, worksheetName: str) -> Worksheet:
     if worksheetName in self.sheetnames:
         raise Exception(f"Cannot create - worksheet '{worksheetName}' already exists")
@@ -390,24 +422,29 @@ class Database:
     crids: dict[str, int] = get_df_at(self.bot_df, role.id, "RID", "CRIDs", read_dict=True)
 
     dataframe = pd.DataFrame(columns=GANG_DATA_HEADERS)
+    print(role.members)
+    print(len(role.members))
     for member in role.members:
+      print(member.name)
       power = self.get_power(member, crids, skipAdmin=True)
       if power < 1:
         raise Exception(f"User doesn't have a subrole")
       subrole = get_role(member.guild, list(crids.keys())[list(crids.values()).index(power)])
 
-      mid = member.id
+      mid = str(member.id)
       name = member.name if not member.nick else member.nick
       rank = subrole.name.split('-')[1].strip()
       rid = str(subrole.id)
       iban = get_df_at(self.get_gang_df(role.name), member.id, "ID", "IBAN")
-      dataframe.loc[len(dataframe.index)] = [mid, name, rank, rid, iban]
-
+      dataframe.loc[len(dataframe)] = [mid, name, rank, rid, iban]
+    print(dataframe.to_string())
     set_with_dataframe(worksheet, dataframe, resize=True)
 
     rocid = get_df_at(self.bot_df, role.id, "RID", "RoCID")
-    channel: TextChannel = role.guild.get_channel(rocid) # type: ignore
-    await update_roster(channel, dataframe)
+    channel: TextChannel | None = await role.guild.fetch_channel(int(rocid)) # type: ignore
+    if not channel: raise Exception("Could not find roster channel")
+    await self.update_roster(channel, role)
+    log.info("Returned")
 
   def can_execute(self,
                   caller: discord.Member,
