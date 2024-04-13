@@ -82,10 +82,15 @@ class Database:
 
   async def init_gang_rosters(self, guild: discord.Guild):
     for gang in self.get_all_gangs(guild):
-      channel_id = int(get_df_at(self.bot_df, gang.id, "RID", "RoCID"))
-      roster = guild.get_channel(channel_id)
-      if not roster: raise Exception(f"Could not get channel with ID {channel_id}")
+      rocid = int(get_df_at(self.bot_df, gang.id, "RID", "RoCID"))
+      roster = guild.get_channel(rocid)
+      if not roster: raise Exception(f"Could not get channel with ID {rocid}")
       await self.refresh_roster(gang)
+
+      racid = int(get_df_at(self.bot_df, gang.id, "RID", "RaCID"))
+      radio = guild.get_channel(racid)
+      if not radio: raise Exception(f"Could not get channel with ID {racid}")
+      # Refresh radio
 
   def get_power(self,
                 member: discord.Member,
