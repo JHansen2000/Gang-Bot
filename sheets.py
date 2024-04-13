@@ -394,7 +394,7 @@ class Database:
       await channel.purge()
       await channel.send(f"{role.mention}\n```{content}```", view=view, silent=True)
 
-  async def update_radio_message(self, channel: discord.TextChannel, role: discord.Role, embed: discord.Embed) -> None:
+  async def update_radio_message(self, channel: discord.TextChannel, role: discord.Role, embed: discord.Embed | None) -> None:
     view = discord.ui.View(timeout=None)
 
     async def radio_callback(interaction: discord.Interaction) -> None:
@@ -406,6 +406,8 @@ class Database:
     radio = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Change Radio")
     radio.callback = radio_callback
     view.add_item(radio)
+
+    
 
     try:
       last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
@@ -481,6 +483,9 @@ class Database:
     channel: TextChannel = role.guild.get_channel(int(rocid)) # type: ignore
     if not channel: raise Exception("Could not find roster channel")
     await self.update_roster(channel, role, dataframe)
+
+  async def refresh_radio(self, role: discord.Role) -> None:
+    
 
   async def assign_iban(self, role: discord.Role, member: discord.Member | discord.User, iban: str) -> None:
     dataframe = self.get_gang_df(role.name)
