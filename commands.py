@@ -2,6 +2,7 @@ import discord
 import string
 import utility
 import sheets
+import asyncio
 import re
 from logger import Logger
 log = Logger()
@@ -168,7 +169,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       cancel = discord.ui.Button(style=discord.ButtonStyle.grey, label="Cancel")
       cancel.callback = cancel_callback
 
-      view = discord.ui.View()
+      view = discord.ui.View(timeout=None)
       view.add_item(confirm)
       view.add_item(cancel)
       await interaction.followup.send(embed=embed, view=view, ephemeral=True)
@@ -252,6 +253,44 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
 
   @change_color.autocomplete("gang")
   async def change_color_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
+    return db.get_gang_choices(interaction.guild)
+
+  @change_com.command(
+    name="radio",
+    description="Change the radio information for a gang"
+  )
+  async def change_radio(interaction: discord.Interaction, gang: str) -> None:
+    """Changes the radio information post in #radio
+
+    Parameters
+    -----------
+    gang_role: Role
+        the role of the gang to change
+    """
+    try:
+      log.info("Command Received: /change radio")
+      await interaction.response.defer(ephemeral=True)
+
+      if gang == "":
+        await interaction.followup.send(embed=dne_embed, view=discord.ui.View(), ephemeral=True)
+        return
+
+      guild = interaction.guild
+      if not guild: raise Exception("Could not get guild")
+      role = sheets.get_role(guild, gang)
+
+      if not db.can_execute(interaction.user, 3, role): # type: ignore
+        await interaction.followup.send(embed=permission_embed, ephemeral=True)
+        return
+
+      await interaction.response.send_modal(sheets.ChangeRadioModal(role, db, False))
+
+    except Exception as e:
+      await interaction.followup.send(embed=fail_embed, ephemeral=True)
+      raise e
+
+  @change_color.autocomplete("gang")
+  async def change_radio_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
     return db.get_gang_choices(interaction.guild)
 
   @change_com.command(
@@ -396,12 +435,13 @@ class CreateGangForm(discord.ui.Modal):
     radio = channels[1]
 
     self.db.update_bot(newRole, newMap, roster.id, radio.id, category=newCategory)
-    res = await color_embed(newRole, roster)
-    await interaction.followup.send(embed=res[0], view=res[1])
-
+    color_res = await color_embed(newRole, roster)
+    
+    await interaction.followup.send(embed=color_res[0], view=color_res[1], ephemeral=True)
+    
     await self.db.update_roster(roster, newRole)
-    res = await radio_embed(newRole, self.db, radio)
-    await interaction.followup.send(embed=res[0], view=res[1])
+    radio_res = await radio_embed(newRole, self.db, radio)
+    await interaction.followup.send(embed=radio_res[0], view=radio_res[1], ephemeral=True)
 
 async def color_embed(gang: discord.Role, roster: discord.TextChannel | None = None, color: discord.Colour = discord.Colour.lighter_grey()) -> tuple[discord.Embed, discord.ui.View]:
   description = f"< This is the current gang color ({'#%02x%02x%02x' % color.to_rgb()}). Is this correct?"
@@ -417,7 +457,7 @@ async def color_embed(gang: discord.Role, roster: discord.TextChannel | None = N
     description = gang.mention + f" was {com_type.lower()} successfully"
     if roster:
       description += '\n' + roster.mention
-    await interaction.response.edit_message(embed=discord.Embed(title=f"Gang Color Configured", description=description, color=color), view=discord.ui.View())
+    await interaction.response.edit_message(embed=discord.Embed(title=f"Gang {com_type} - {gang.name}", description=description, color=color), view=discord.ui.View())
 
   async def change_color(interaction: discord.Interaction) -> None:
     await interaction.response.send_modal(ChooseColorModal(gang, roster, color))
@@ -427,28 +467,25 @@ async def color_embed(gang: discord.Role, roster: discord.TextChannel | None = N
   change = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Change Color")
   change.callback = change_color
 
-  view = discord.ui.View()
+  view = discord.ui.View(timeout=None)
   view.add_item(confirm)
   view.add_item(change)
 
   return embed, view
 
 async def radio_embed(gang: discord.Role, db: sheets.Database, radio: discord.TextChannel) -> tuple[discord.Embed, discord.ui.View]:
-  embed = discord.Embed(title=f"Set Up Radio - {gang.name}", description="Set up radio channels now or later?", color=gang.color)
-  view = discord.ui.View()
+  embed = discord.Embed(title=f"Set Up Radio - {gang.name}", description="Set up radio channels now or later?", color=discord.Colour.yellow())
+  view = discord.ui.View(timeout=None)
 
   async def set_now(interaction: discord.Interaction) -> None:
-    await interaction.response.send_modal(sheets.ChangeRadioModal(gang, db, True))
-    if not radio_embed:
-      await interaction.response.edit_message(embed=discord.Embed(title="Something Went Wrong", description=f"Could not set radio channels!\nTry again with `/change radio` OR press the button in {radio.mention}"), view=discord.ui.View())
-    await interaction.followup.send(embed=discord.Embed(title=f"{gang.mention} Created", color=gang.color))
+    await interaction.response.send_modal(sheets.ChangeRadioModal(gang, db, False))
   now = discord.ui.Button(style=discord.ButtonStyle.green, label="Set Now")
   now.callback = set_now
 
   async def set_later(interaction: discord.Interaction) -> None:
-    radio_embed = discord.Embed(title=f"Radio Channels - {gang.name}", description="Not set!\nSet with `/change radio` OR press the button below!", color=gang.color)
+    radio_embed = discord.Embed(title=f"Radio Channels - {gang.name}", description="Not set!\nSet with `/change radio` OR press the button below!", color=discord.Colour.yellow())
     await db.update_radio_message(radio, gang, radio_embed)
-    await interaction.response.defer(thinking=False)
+    await interaction.response.edit_message(embed=discord.Embed(title=f"Radio Left Unconfigured", description=radio.mention, color=discord.Colour.yellow()), view=discord.ui.View())
   later = discord.ui.Button(style=discord.ButtonStyle.gray, label="Later")
   later.callback = set_later
 

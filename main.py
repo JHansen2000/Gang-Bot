@@ -50,7 +50,8 @@ async def on_ready() -> None:
         log.info(f"{client.user} is now running")
         await global_db.init_gang_rosters(guild)
     except Exception as e:
-        log.fatal(f"Failed to start\n\n{e}\n\n")
+        log.fatal(f"Failed to start")
+        raise e
 
 def main() -> None:
   try:

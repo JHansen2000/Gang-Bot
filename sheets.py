@@ -354,7 +354,7 @@ class Database:
     await self.update_roster_message(channel, output, role)
 
   async def update_roster_message(self, channel: discord.TextChannel, content: str, role: discord.Role) -> None:
-    view = discord.ui.View()
+    view = discord.ui.View(timeout=None)
 
     async def refresh_callback(interaction: discord.Interaction) -> None:
       await self.refresh_roster(role)
@@ -378,17 +378,19 @@ class Database:
     iban = discord.ui.Button(style=discord.ButtonStyle.blurple, label="Set IBAN")
     iban.callback = iban_callback
     view.add_item(iban)
-
-    last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
+    try:
+      last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
+    except:
+      last = None
     if last and last.author.id == int(BOT_ID):
-        await last.edit(content=f"{role.mention}\n```{content}```", view=view)
+      await last.edit(content=f"{role.mention}\n```{content}```", view=view)
     else:
-        log.info(f"Roster message not found - creating...")
-        await channel.purge()
-        await channel.send(f"{role.mention}\n```{content}```", view=view, silent=True)
+      log.info(f"Roster message not found - creating...")
+      await channel.purge()
+      await channel.send(f"{role.mention}\n```{content}```", view=view, silent=True)
 
   async def update_radio_message(self, channel: discord.TextChannel, role: discord.Role, embed: discord.Embed) -> None:
-    view = discord.ui.View()
+    view = discord.ui.View(timeout=None)
 
     async def radio_callback(interaction: discord.Interaction) -> None:
       member = interaction.user
@@ -400,13 +402,16 @@ class Database:
     radio.callback = radio_callback
     view.add_item(radio)
 
-    last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
+    try:
+      last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
+    except:
+      last = None
     if last and last.author.id == int(BOT_ID):
-        await last.edit(embed=embed, view=view)
+      await last.edit(embed=embed, view=view)
     else:
-        log.info(f"Radio message not found - creating...")
-        await channel.purge()
-        await channel.send(embed=embed, view=view, silent=True)
+      log.info(f"Radio message not found - creating...")
+      await channel.purge()
+      await channel.send(embed=embed, view=view, silent=True)
 
   def delete_sheet(self, sheetname: str, role: discord.Role | None = None) -> None:
     if role:
@@ -605,21 +610,21 @@ class ChangeRadioModal(discord.ui.Modal):
     style=discord.TextStyle.short,
     placeholder="22.22",
     required=True,
-    row = 0
+    row = 1
   )
   tertiary = discord.ui.TextInput(
     label="What is your tertiary radio channel?",
     style=discord.TextStyle.short,
     placeholder="33.33",
     required=True,
-    row = 0
+    row = 2
   )
   notes = discord.ui.TextInput(
-    label="Do you have any notes/instructions for radio channel usage?",
+    label="Do you have any notes/instructions?",
     style=discord.TextStyle.long,
     placeholder="Notes...",
     required=False,
-    row = 0
+    row = 3
   )
 
   async def on_submit(self, interaction: discord.Interaction) -> None:
@@ -641,7 +646,7 @@ class ChangeRadioModal(discord.ui.Modal):
       if self.buttonPressed:
         await interaction.response.defer(thinking=False)
       else:
-        await interaction.response.send_message(embed=discord.Embed(title="Radio Updated", color=discord.Colour.dark_green()), ephemeral=True)
+        await interaction.response.edit_message(embed=discord.Embed(title=f"Radio Configured - {self.role.name}", description=channel.mention, color=self.role.color), view=discord.ui.View())
 
     else:
       # Error here
