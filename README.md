@@ -7,12 +7,10 @@
 - `python3 main.py`
 
 ## Current Task:
+- Log changes in #audit-log channel
+- Create command to create joint categories
+  - **STRETCH** Delete joint categories if one gang is deleted
 
 ## TODO
-- Log changes in #audit-log channel
-- Create event handler on member leave
-- Create event handler on member join
-- Create command to create joint categories
-- Send help messages on gang create
-  - **STRETCH** Delete joint categories if one gang is deleted
-- **STRETCH** Create custom tags (non-functional)
+- **STRETCH** Create event handler on member join
+- **ULTRA-STRETCH** Create custom tags (non-functional)

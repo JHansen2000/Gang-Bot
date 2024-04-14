@@ -1,4 +1,4 @@
-from discord import AuditLogAction, AuditLogEntry, Client, Role
+from discord import AuditLogAction, AuditLogEntry, Member, User, Client, Role
 import sheets
 import logger
 log = logger.Logger()
@@ -129,3 +129,13 @@ def get_events(client: Client, db: sheets.Database) -> None:
       if entry.action is AuditLogAction.role_delete:
         log.info(f"Bot deleted role: {entry.changes.before.name}")
       # log.warning(str(entry.action))
+
+  @client.event
+  async def on_member_remove(member: Member):
+    guild = member.guild
+    for gang in db.get_gangs(member):
+      db.update_gang(gang.name, member, True)
+      channel_id = sheets.get_df_at(db.bot_df, gang.id, "RID", "RoCID")
+      roster = guild.get_channel(int(channel_id))
+      await db.update_roster(roster, gang) # type: ignore
+    log.info(f"Member {member.name} removed")

@@ -1,5 +1,6 @@
 import pandas as pd
 from discord import Guild, Role, CategoryChannel, TextChannel, Member
+from help_messages import commands_help_embed, leaders_help_embed
 from logger import Logger
 log = Logger()
 
@@ -47,6 +48,7 @@ async def create_gang_channels(guild: Guild, role: Role, subroles: list[Role], c
     category=category)
   await leadership.set_permissions(role, view_channel=False)
   await leadership.set_permissions(subroles[1], view_channel=False)
+  await leadership.send(embed=leaders_help_embed)
 
   command = await guild.create_text_channel(
     name="command",
@@ -126,6 +128,7 @@ async def create_gang_channels(guild: Guild, role: Role, subroles: list[Role], c
   await bot_commands.set_permissions(guild.default_role,
     view_channel=False,
     use_application_commands=True)
+  await bot_commands.send(embed=commands_help_embed)
 
   await guild.create_voice_channel(
     name="VC - 1",

@@ -492,10 +492,6 @@ async def radio_embed(gang: discord.Role, db: sheets.Database, radio: discord.Te
   view.add_item(now)
   view.add_item(later)
   return embed, view
-  
-
-
-
 
 class ChooseColorModal(discord.ui.Modal):
   def __init__(self, gang: discord.Role, roster: discord.TextChannel | None, color: discord.Colour = discord.Colour.greyple()):

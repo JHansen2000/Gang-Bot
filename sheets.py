@@ -418,7 +418,8 @@ class Database:
       else:
         await last.edit(view=view)
     else:
-      if not embed: raise Exception("Cannot create message with no embed")
+      if not embed:
+        embed = discord.Embed(title=f"Radio Channels - {role.name}", description="Not set!\nSet with `/change radio` OR press the button below!", color=discord.Colour.yellow())
       log.info(f"Radio message not found - creating...")
       await channel.purge()
       await channel.send(embed=embed, view=view, silent=True)
