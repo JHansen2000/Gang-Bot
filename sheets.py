@@ -90,7 +90,7 @@ class Database:
       racid = int(get_df_at(self.bot_df, gang.id, "RID", "RaCID"))
       radio = guild.get_channel(racid)
       if not radio: raise Exception(f"Could not get channel with ID {racid}")
-      # Refresh radio
+      await self.update_radio_message(radio, gang, None) # type: ignore
 
   def get_power(self,
                 member: discord.Member,
@@ -395,6 +395,7 @@ class Database:
       await channel.send(f"{role.mention}\n```{content}```", view=view, silent=True)
 
   async def update_radio_message(self, channel: discord.TextChannel, role: discord.Role, embed: discord.Embed | None) -> None:
+    log.info(f"Refreshing @{role.name} radio...")
     view = discord.ui.View(timeout=None)
 
     async def radio_callback(interaction: discord.Interaction) -> None:
@@ -407,15 +408,17 @@ class Database:
     radio.callback = radio_callback
     view.add_item(radio)
 
-    
-
     try:
       last = [message async for message in channel.history(limit = 1, oldest_first=True)][0]
     except:
       last = None
     if last and last.author.id == int(BOT_ID):
-      await last.edit(embed=embed, view=view)
+      if embed:
+        await last.edit(embed=embed, view=view)
+      else:
+        await last.edit(view=view)
     else:
+      if not embed: raise Exception("Cannot create message with no embed")
       log.info(f"Radio message not found - creating...")
       await channel.purge()
       await channel.send(embed=embed, view=view, silent=True)
@@ -483,9 +486,6 @@ class Database:
     channel: TextChannel = role.guild.get_channel(int(rocid)) # type: ignore
     if not channel: raise Exception("Could not find roster channel")
     await self.update_roster(channel, role, dataframe)
-
-  async def refresh_radio(self, role: discord.Role) -> None:
-    
 
   async def assign_iban(self, role: discord.Role, member: discord.Member | discord.User, iban: str) -> None:
     dataframe = self.get_gang_df(role.name)
@@ -645,7 +645,7 @@ class ChangeRadioModal(discord.ui.Modal):
       embed.add_field(name="Primary:", value=str(self.primary), inline=False)
       embed.add_field(name="Secondary:", value=str(self.secondary), inline=False)
       embed.add_field(name="Tertiary:", value=str(self.tertiary), inline=False)
-      if self.notes:
+      if self.notes != "":
         embed.add_field(name="Notes:", value=str(self.notes), inline=False)
 
       racid = get_df_at(self.db.bot_df, self.role.id, "RID", "RaCID")

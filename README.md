@@ -7,8 +7,6 @@
 - `python3 main.py`
 
 ## Current Task:
-- Test Radio buttons/commands/create
-- Radio needs to be re-initialized on bot startup
 
 ## TODO
 - Log changes in #audit-log channel
