@@ -289,7 +289,7 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
       await interaction.followup.send(embed=fail_embed, ephemeral=True)
       raise e
 
-  @change_color.autocomplete("gang")
+  @change_radio.autocomplete("gang")
   async def change_radio_autocomplete(interaction: discord.Interaction, gang: str) -> list[discord.app_commands.Choice[str]]:
     return db.get_gang_choices(interaction.guild)
 
