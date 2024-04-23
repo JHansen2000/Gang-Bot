@@ -2,7 +2,7 @@ import discord
 import string
 import utility
 import sheets
-import asyncio
+import datetime
 import re
 from logger import Logger
 log = Logger()
@@ -21,27 +21,31 @@ def get_commands(tree: discord.app_commands.CommandTree[discord.Client],
     guild=guild
   )
   async def waiver(interaction: discord.Interaction) -> None:
-    """waiver Command
-
-    Parameters
-    -----------
-    gang_role: Role
-      the role of the gang to print
-    """
     try:
       log.info("Command Received: /waiver")
+
       embed = discord.Embed(title="CORE RP Liability Waiver", description='This Liability Waiver ("Waiver") is entered into by and between CORE Roleplay ("CORE RP"), a legal Limited Liability Company registered in the State of Virginia, and all members ("Members") of the CORE RP community.', color=discord.Colour.brand_green())
-      embed.add_field(name="**1. Assumption of Risk**", value='By clicking "**I AGREE**", indicating agreement to this Waiver and participating in any activities, events, or interactions within the CORE RP community, Members acknowledge and accept the inherent risks associated with online gaming, including but not limited to exposure to explicit language, graphic content, and potential conflicts with other Members.', inline=False)
+      embed.add_field(name="**1. Assumption of Risk**", value='By clicking "**I AGREE**" and participating in any activities, events, or interactions within the CORE RP community, Members acknowledge and accept the inherent risks associated with online gaming, including but not limited to exposure to explicit language, graphic content, and potential conflicts with other Members.', inline=False)
       embed.add_field(name="**2. Release of Liability**", value='Members hereby release, waive, discharge, and covenant not to sue CORE RP, its owners, employees, agents, representatives, or affiliates from any and all claims, demands, losses, damages, liabilities, or expenses (including legal fees) arising out of or related to their participation in CORE RP activities, events, or interactions.', inline=False)
-      embed.add_field(name="**3. Privacy and Data Collection**", value="Members acknowledge that CORE RP may collect and store their legal names and IP addresses for the purpose of community management, security, and compliance with applicable laws and regulations. Members' personal information will be strictly protected and never released to third parties without consent, except as required by law", inline=False)
+      embed.add_field(name="**3. Privacy and Data Collection**", value="Members acknowledge that CORE RP may collect and store their IP addresses for the purpose of community management, security, and compliance with applicable laws and regulations. Members' personal information will be strictly protected and never released to third parties without consent, except as required by law", inline=False)
       embed.add_field(name="**4. Membership Termination**", value="CORE RP reserves the right to terminate any Member's membership with or without reason, at its sole discretion. Termination may occur immediately upon notice to the Member, and no refunds or compensation will be provided for any donations or in-game purchases made by the Member.", inline=False)
       embed.add_field(name="**5. Media Usage**", value="Members agree that any video or audio recordings captured within the CORE RP server shall not be used for commercial or personal gain without explicit authorization. Approved streamers and content creators may be entitled to exceptions under a separate media usage agreement.", inline=False)
       embed.add_field(name="**6. Asset Usage**", value="Members acknowledge that any CORE RP assets, including but not limited to custom scripts, textures, intellectual property, community videos, logos, images, titles, and other proprietary content, are strictly prohibited for use outside the CORE RP server without explicit authorization.", inline=False)
       embed.add_field(name="**7. Compliance with Laws**", value="Members agree to abide by all applicable Federal and State laws, regulations, and ordinances while participating in CORE RP activities. Members also agree not to engage in any illegal activities, including but not limited to hacking, cheating, or harassment, within the CORE RP community.", inline=False)
       embed.add_field(name="**8. Governing Law**", value="This Waiver shall be governed by and construed in accordance with the laws of the State of Virginia, without regard to its conflict of law provisions.", inline=False)
       embed.add_field(name="**9. Severability**", value="If any provision of this Waiver is found to be unenforceable or invalid, the remaining provisions shall remain in full force and effect.", inline=False)
-      embed.add_field(name="**10. Acknowledgement**", value="By checking the box indicating agreement to this Waiver, Members acknowledge that they have read and understood its terms and voluntarily agree to be bound by them.", inline=False)
-      view = discord.ui.View()
+      embed.add_field(name="**10. Acknowledgement**", value='By clicking "**I AGREE**", Members acknowledge that they have read and understood the terms of this Waiver and voluntarily agree to be bound by them.', inline=False)
+
+      view = discord.ui.View(timeout=None)
+
+      async def agree_callback(interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(content=f"{interaction.user.mention} has agreed to the waiver - [{datetime.datetime.today()}]", ephemeral=True)
+        log.info("Some action to create a record, send to user & file away")
+
+      agree = discord.ui.Button(style=discord.ButtonStyle.green, label="I AGREE")
+      agree.callback = agree_callback
+      view.add_item(agree)
+
       await interaction.response.send_message(embed=embed, view=view)
 
     except Exception as e:
@@ -473,11 +477,12 @@ async def radio_embed(gang: discord.Role, db: sheets.Database, radio: discord.Te
   embed = discord.Embed(title=f"Set Up Radio - {gang.name}", description="Set up radio channels now or later?", color=discord.Colour.yellow())
   view = discord.ui.View(timeout=None)
 
-    async def set_now(interaction: discord.Interaction) -> None:
-      radio_embed = await interaction.response.send_modal(sheets.ChangeRadioModal(gang, db, True))
-      if not radio_embed:
-        await interaction.response.edit_message(embed=discord.Embed(title="Something Went Wrong", description=f"Could not set radio channels!\nTry again with `/change radio` OR press the button in {radio.mention}"), view=discord.ui.View())
-
+  async def set_now(interaction: discord.Interaction) -> None:
+    radio_embed = await interaction.response.send_modal(sheets.ChangeRadioModal(gang, db, True))
+    if not radio_embed:
+      await interaction.response.edit_message(embed=discord.Embed(title="Something Went Wrong", description=f"Could not set radio channels!\nTry again with `/change radio` OR press the button in {radio.mention}"), view=discord.ui.View())
+  now = discord.ui.Button(style=discord.ButtonStyle.green, label="Now")
+  now.callback = set_now
 
   async def set_later(interaction: discord.Interaction) -> None:
     radio_embed = discord.Embed(title=f"Radio Channels - {gang.name}", description="Not set!\nSet with `/change radio` OR press the button below!", color=discord.Colour.yellow())
